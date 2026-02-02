@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build:local": "tsc -b",
     "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
     "start": "npx tsx apps/backend/src/main.ts",
     "dev:backend": "npm run dev --workspace=apps/backend",
