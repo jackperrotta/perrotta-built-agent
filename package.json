@@ -10,16 +10,16 @@
     "build": "tsc -b",
     "gcp-build": "npm run build",
     "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
-    "start": "node apps/backend/dist/main.js",
+    "start": "ls -R apps/backend && node apps/backend/dist/main.js",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:web": "npm run start --workspace=apps/web",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\""
   },
   "dependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.5"
   },
   "devDependencies": {
-    "@types/node": "^20.11.5",
     "concurrently": "^9.2.1",
     "eslint": "^8.56.0",
     "prettier": "^3.2.4"
