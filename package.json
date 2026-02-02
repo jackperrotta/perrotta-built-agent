@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
-    "start": "npm run start --workspace=apps/backend",
+    "start": "node apps/backend/dist/main.js",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:web": "npm run start --workspace=apps/web",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\""
