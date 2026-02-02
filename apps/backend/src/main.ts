@@ -5,8 +5,13 @@ import { type ScanSession } from '@construction/shared';
 const app = express();
 const port = Number(process.env.PORT) || 8080;
 
+import * as path from 'path';
+
 app.use(cors());
 app.use(express.json());
+
+// Serve static frontend files
+app.use(express.static(path.resolve('apps/web')));
 
 import sessionsRouter from './routes/sessions.js';
 import uploadRouter from './routes/upload.js';

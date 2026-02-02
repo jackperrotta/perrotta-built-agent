@@ -8,16 +8,16 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "gcp-build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/backend",
     "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
-    "start": "ls -R apps/backend && node apps/backend/dist/main.js",
+    "start": "npx tsx apps/backend/src/main.ts",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:web": "npm run start --workspace=apps/web",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\""
   },
   "dependencies": {
     "typescript": "^5.3.3",
-    "@types/node": "^20.11.5"
+    "@types/node": "^20.11.5",
+    "tsx": "^4.7.0"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
