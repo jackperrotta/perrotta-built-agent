@@ -20,7 +20,7 @@ if (isMock) {
     if (!admin.apps.length) {
         admin.initializeApp({
             credential: admin.credential.applicationDefault(),
-            storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'default-bucket'
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'perrotta-built-agent.firebasestorage.app'
         });
     }
 
