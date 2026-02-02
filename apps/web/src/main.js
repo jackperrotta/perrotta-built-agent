@@ -3,7 +3,7 @@ const statusDiv = document.getElementById('status');
 
 async function checkBackendHealth() {
     try {
-        const response = await fetch('http://localhost:3001/health');
+        const response = await fetch('http://localhost:8080/health');
         const data = await response.json();
         if (statusDiv) {
             statusDiv.innerText = `Backend Status: ${data.status} at ${data.timestamp}`;
