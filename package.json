@@ -1,0 +1,23 @@
+{
+  "name": "construction-scanning-platform",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:web": "npm run start --workspace=apps/web",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "concurrently": "^9.2.1",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  }
+}

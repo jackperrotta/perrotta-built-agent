@@ -1,0 +1,23 @@
+{
+    "files": [],
+    "references": [
+        {
+            "path": "./packages/shared"
+        },
+        {
+            "path": "./packages/geometry"
+        },
+        {
+            "path": "./packages/audio"
+        },
+        {
+            "path": "./packages/vision"
+        },
+        {
+            "path": "./packages/layout"
+        },
+        {
+            "path": "./apps/backend"
+        }
+    ]
+}
