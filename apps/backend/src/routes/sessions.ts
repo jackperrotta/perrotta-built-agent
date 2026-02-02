@@ -58,7 +58,7 @@ router.get('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =>
         // For now, listing all for simplicity or admin view
         const snapshot = await sessionsCollection.orderBy('createdAt', 'desc').get();
 
-        const sessions = snapshot.docs.map(doc => doc.data() as ScanSession);
+        const sessions = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as ScanSession);
         res.json(sessions);
     } catch (error) {
         console.error('Error listing sessions:', error);
