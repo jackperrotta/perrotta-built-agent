@@ -34,6 +34,7 @@ export interface ScanSegment {
     roomPlanModelUrl?: string;
     arWorldMapUrl?: string;
     videoChunkUrl?: string;
+    roomPlanJSONRemoteURL?: string;
 }
 
 export interface CapturedImage {
