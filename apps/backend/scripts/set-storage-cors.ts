@@ -6,7 +6,7 @@ async function setCors() {
 
     const corsConfiguration = [
         {
-            origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+            origin: ["http://localhost:3000", "http://127.0.0.1:3000", "https://perrottabuilt.com", "https://www.perrottabuilt.com"],
             method: ["GET"],
             responseHeader: ["Content-Type"],
             maxAgeSeconds: 3600
