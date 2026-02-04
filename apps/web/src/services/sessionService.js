@@ -1,8 +1,12 @@
 import { getToken } from '../auth.js';
 
 // Base API URL
-// In production this might be relative, but in local dev we target port 8080 explicitly
-const API_URL = 'http://localhost:8080/api';
+// In local dev (port 3000), target port 8080. In production (same origin), use relative path.
+const API_BASE = window.location.hostname === 'localhost' && window.location.port === '3000'
+    ? 'http://localhost:8080'
+    : '';
+
+const API_URL = `${API_BASE}/api`;
 
 /**
  * Fetch all scan sessions
