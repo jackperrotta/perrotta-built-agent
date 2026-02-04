@@ -3,9 +3,10 @@
     "version": "0.0.1",
     "private": true,
     "scripts": {
-        "start": "serve ."
+        "start": "node server.js"
     },
     "devDependencies": {
-        "serve": "^14.2.1"
+        "@needle-tools/usd": "^0.0.1-61ded11",
+        "three": "^0.164.1"
     }
 }

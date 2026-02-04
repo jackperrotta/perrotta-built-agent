@@ -48,6 +48,51 @@ export function generateFloorplanSvg(data) {
     if (data.doors) data.doors.forEach(d => extractLine(d, 'door'));
     if (data.openings) data.openings.forEach(o => extractLine(o, 'opening'));
 
+    // --- Auto-Alignment Logic ---
+    if (lines.length > 0) {
+        // 1. Calculate weighted mean angle (modulo 90 degrees)
+        // We use vectors in 4*theta space to handle 0, 90, 180, 270 equivalence
+        let sumSin = 0;
+        let sumCos = 0;
+
+        lines.forEach(l => {
+            // Only consider walls for alignment as they are structurally defining
+            if (l.type !== 'wall') return;
+
+            const dx = l.end.x - l.start.x;
+            const dy = l.end.y - l.start.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            // Multiply angle by 4 to map all axes to 0
+            sumSin += len * Math.sin(4 * angle);
+            sumCos += len * Math.cos(4 * angle);
+        });
+
+        // If we found walls, calculate rotation
+        if (sumCos !== 0 || sumSin !== 0) {
+            const avgAngle4 = Math.atan2(sumSin, sumCos);
+            const dominantAngle = avgAngle4 / 4;
+            const rotation = -dominantAngle;
+
+            // 2. Rotate all points
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+
+            lines.forEach(l => {
+                // Rotate start
+                const sx = l.start.x * cos - l.start.y * sin;
+                const sy = l.start.x * sin + l.start.y * cos;
+                l.start.x = sx; l.start.y = sy;
+
+                // Rotate end
+                const ex = l.end.x * cos - l.end.y * sin;
+                const ey = l.end.x * sin + l.end.y * cos;
+                l.end.x = ex; l.end.y = ey;
+            });
+        }
+    }
+
     if (lines.length === 0) return '<svg viewBox="0 0 100 100"><text x="50" y="50" text-anchor="middle">No Plan Data</text></svg>';
 
     // Calculate Bounds
@@ -107,9 +152,8 @@ export function generateFloorplanSvg(data) {
     };
 
     // Helper: Draw Dimension Line
-    // offset: Distance to shift line. Positive = Left of vector, Negative = Right.
-    // We want to force it "Outward".
-    const drawDimension = (start, end, forceOutward = true, baseOffset = 0.4) => {
+    // placement: 'outward' (default), 'inward', or 'none'
+    const drawDimension = (start, end, placement = 'outward', baseOffset = 0.4) => {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const len = Math.sqrt(dx * dx + dy * dy);
@@ -125,31 +169,35 @@ export function generateFloorplanSvg(data) {
 
         let finalOffset = baseOffset;
 
-        if (forceOutward) {
-            // Midpoint of wall
-            const midX = (start.x + end.x) / 2;
-            const midY = (start.y + end.y) / 2;
+        // Robust Inward/Outward Check: Compare distance to Center
+        // Midpoint of wall
+        const wallMidX = (start.x + end.x) / 2;
+        const wallMidY = (start.y + end.y) / 2;
 
-            // Vector from Center to Wall
-            const c2w_x = midX - center.x;
-            const c2w_y = midY - center.y;
+        // Test Point 1: Midpoint + Normal*Offset
+        const tp1x = wallMidX + nx * baseOffset;
+        const tp1y = wallMidY + ny * baseOffset;
 
-            // Dot product with Normal
-            const dot = c2w_x * nx + c2w_y * ny;
+        // Test Point 2: Midpoint - Normal*Offset
+        const tp2x = wallMidX - nx * baseOffset;
+        const tp2y = wallMidY - ny * baseOffset;
 
-            // If dot is negative, Normal points Inward. We want Outward.
-            // We want the offset vector to point same direction as C2W.
-            // Offset vector is (offset * nx, offset * ny).
-            // If offset > 0, it points in direction of N.
-            // So if N points inward (dot < 0), we need offset < 0.
-            // If N points outward (dot > 0), we need offset > 0.
+        // Distances squared
+        const d1 = (tp1x - center.x) ** 2 + (tp1y - center.y) ** 2;
+        const d2 = (tp2x - center.x) ** 2 + (tp2y - center.y) ** 2;
 
-            if (dot < 0) {
-                finalOffset = -Math.abs(baseOffset);
-            } else {
-                finalOffset = Math.abs(baseOffset);
-            }
+        let usePositive = true;
+
+        if (placement === 'inward') {
+            // Pick closer point
+            usePositive = (d1 < d2);
+        } else {
+            // Outward: Pick further point
+            usePositive = (d1 > d2);
         }
+
+        const sign = usePositive ? 1 : -1;
+        finalOffset = sign * Math.abs(baseOffset);
 
         // Offset points
         const p1x = start.x + nx * finalOffset;
@@ -196,24 +244,11 @@ export function generateFloorplanSvg(data) {
     });
 
     // Windows (Don't force outward, usually inside or along line is better, or same as wall? Let's use same as wall logic but closer)
+    // Windows
     lines.filter(l => l.type === 'window').forEach(l => {
         svgContent += `<line x1="${l.start.x}" y1="${l.start.y}" x2="${l.end.x}" y2="${l.end.y}" stroke="#00BFFF" stroke-width="${strokeWidth * 0.8}" />`;
-        // Use outward logic but smaller offset or slightly different to not overlap wall dim
-        // Let's put window dims slightly "inward" or Just on the line? "Inward" might be cleaner if Wall is Outward.
-        // Let's force Inward (-baseOffset)
-        svgContent += drawDimension(l.start, l.end, true, -0.3); // Negative relative to outward logic = Inward? No, logic above flips based on Dot.
-        // If we want inward, we just flip the sign of the result of the logic?
-        // Actually, if I pass -0.3 to logic:
-        // If N points In (Dot<0), logic sets final = -abs(-0.3) = -0.3. So points In.
-        // If N points Out (Dot>0), logic sets final = abs(-0.3) = 0.3. So points Out.
-        // It basically enforces "Direction of Norm matches Direction of Centroid-Ray".
-        // If we want Opposite of Outward (Inward), we should just invert the result of logic, or...
-        // Let's just trust "Outward" for windows too but closer? Overlaps wall?
-        // Walls are at 0.4. Windows at 0.2?
-        // No, User said "Dimensions labels outside".
-        // Maybe windows should be outside too, slightly further? or closer?
-        // Let's try closer (0.2).
-        svgContent += drawDimension(l.start, l.end, true, 0.2);
+        // Move Windows INWARD (0.5) to avoid overlap with wall dimensions
+        svgContent += drawDimension(l.start, l.end, 'inward', 0.5);
     });
 
     // Doors

@@ -11,6 +11,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- SVG Pan Zoom for CAD-like interaction -->
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <!-- Import Map for local modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://esm.sh/three@0.173.0",
+                "three/addons/": "https://esm.sh/three@0.173.0/examples/jsm/",
+                "@needle-tools/usd": "/lib/needle/index.js",
+                "fflate": "https://esm.sh/fflate@0.8.2"
+            }
+        }
+    </script>
+
+    <!-- Vite handles imports automatically via package.json dependencies -->
+
     <style>
         body {
             font-family: sans-serif;
@@ -126,6 +141,153 @@
             }
         });
 
+        // Three.js & Needle USD Viewer Helper
+        async function initThreeJSViewer(containerId, url) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            try {
+                // Restore Dynamic Imports
+                const THREE = await import('three');
+                const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+                const { getUsdModule, createThreeHydra } = await import('@needle-tools/usd');
+
+                // Scene Setup
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf0f0f0);
+
+                const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+                camera.position.set(0, 1.5, 4);
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 1;
+                container.appendChild(renderer.domElement);
+
+                // Lighting
+                const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2.0);
+                scene.add(hemiLight);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+                dirLight.position.set(2, 4, 2);
+                scene.add(dirLight);
+
+                // Controls
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.minDistance = 0.5;
+                controls.maxDistance = 10;
+                controls.target.set(0, 0.5, 0);
+
+                // Show Loading
+                const loadingDiv = document.createElement('div');
+                loadingDiv.innerText = "Initializing Needle WASM...";
+                loadingDiv.style.position = 'absolute';
+                loadingDiv.style.top = '50%'; loadingDiv.style.left = '50%';
+                loadingDiv.style.transform = 'translate(-50%, -50%)';
+                loadingDiv.style.color = '#333';
+                loadingDiv.style.fontWeight = 'bold';
+                loadingDiv.style.textAlign = 'center';
+                container.style.position = 'relative';
+                container.appendChild(loadingDiv);
+
+                // --- Needle / OpenUSD Loading ---
+                try {
+                    // 1. Initialize WASM Module
+                    const USD = await getUsdModule();
+                    loadingDiv.innerText = "Downloading USDZ...";
+
+                    // Pre-fetch the file as a buffer
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+                    const buffer = await response.arrayBuffer();
+
+                    // 3. Manually write to WASM filesystem (Bypassing internal logic)
+                    // This ensures the file exists exactly where we say it does
+                    const virtualFileName = 'model.usdz';
+                    try {
+                        USD.FS_createDataFile('/', virtualFileName, new Uint8Array(buffer), true, true, true);
+                        console.log(`Wrote ${buffer.byteLength} bytes to /${virtualFileName}`);
+                    } catch (fsErr) {
+                        console.warn("File might already exist, overwriting...", fsErr);
+                        try {
+                            USD.FS_unlink('/' + virtualFileName);
+                            USD.FS_createDataFile('/', virtualFileName, new Uint8Array(buffer), true, true, true);
+                        } catch (e) {
+                            console.error("FS Error:", e);
+                        }
+                    }
+
+                    loadingDiv.innerText = "Loading into Hydra...";
+
+                    // 4. Load into Hydra using the virtual path
+                    const hydra = await createThreeHydra({
+                        USD,
+                        scene: scene,
+                        url: "/" + virtualFileName, // Absolute path in MEMFS
+                        files: [],
+                        debug: true
+                    });
+
+                    // Success
+                    loadingDiv.remove();
+
+                    // Optional: Center Model
+                    const box = new THREE.Box3().setFromObject(scene);
+                    if (!box.isEmpty()) {
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        // Camera Auto-Fit
+                        if (maxDim > 0) {
+                            const fitHeightDistance = maxDim / (2 * Math.atan(Math.PI * camera.fov / 360));
+                            const fitWidthDistance = fitHeightDistance / camera.aspect;
+                            const distance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance);
+
+                            const center = box.getCenter(new THREE.Vector3());
+
+                            camera.position.set(center.x, center.y + (maxDim / 2), center.z + distance);
+                            camera.lookAt(center);
+                            controls.target.copy(center);
+                        }
+                    }
+
+                    // --- Animation Loop ---
+                    function animate() {
+                        requestAnimationFrame(animate);
+
+                        // Update Hydra (animations, etc)
+                        if (hydra.update) {
+                            hydra.update(0.016);
+                        }
+
+                        controls.update();
+                        renderer.render(scene, camera);
+                    }
+                    animate();
+
+                } catch (loadErr) {
+                    console.error("Needle Load Error:", loadErr);
+                    loadingDiv.innerHTML = `<p style="color:red">Failed to load USDZ (WASM): ${loadErr.message}</p>
+                    <p><a href="${url}" download>Download File</a></p>`;
+                }
+
+                // Handle Resize
+                window.addEventListener('resize', () => {
+                    if (container && container.clientWidth > 0) {
+                        camera.aspect = container.clientWidth / container.clientHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(container.clientWidth, container.clientHeight);
+                    }
+                });
+
+            } catch (err) {
+                console.error("Viewer init failed", err);
+                container.innerHTML = `<p style='color:red;'>Viewer Error: ${err.message}</p>`;
+            }
+        }
+
         async function loadSessionDetails(id) {
             try {
                 const session = await getSessionById(id);
@@ -174,26 +336,48 @@
 
                         // 3D Model
                         if (modelUrl) {
-                            html += `
-                                <div class="media-item">
-                                    <h4>3D Model</h4>
-                                    <model-viewer 
-                                        src="${modelUrl}" 
-                                        ios-src="${modelUrl}"
-                                        alt="3D Model of ${segment.type}"
-                                        auto-rotate 
-                                        camera-controls>
-                                    </model-viewer>
-                                    <p><a href="${modelUrl}" download>Download Model</a></p>
-                                </div>
-                            `;
+                            const isUsdzFile = modelUrl.toLowerCase().split('?')[0].endsWith('.usdz');
+                            // Always assume USDZ if we have a modelUrl from RoomPlan
+                            // But let's check extension just in case.
+
+                            if (true) { // Force Needle Viewer as primary for now if we know they are USDZs
+                                // Three.js Viewer for USDZ
+                                const containerId = `model-container-${segment.id}`;
+                                html += `
+                                    <div class="media-item">
+                                        <h4>3D Model (USDZ)</h4>
+                                        <div id="${containerId}" style="width: 100%; height: 400px; background: #eee; border-radius: 8px;"></div>
+                                        <p><a href="${modelUrl}" download>Download .usdz</a></p>
+                                    </div>
+                                `;
+
+                                // Defer initialization until DOM update
+                                setTimeout(() => {
+                                    initThreeJSViewer(containerId, modelUrl);
+                                }, 100);
+
+                            } else {
+                                // Standard GLB Viewer fallback
+                                html += `
+                                    <div class="media-item">
+                                        <h4>3D Model</h4>
+                                        <model-viewer 
+                                            src="${modelUrl}" 
+                                            ios-src="${modelUrl}"
+                                            alt="3D Model of ${segment.type}"
+                                            auto-rotate 
+                                            camera-controls>
+                                        </model-viewer>
+                                        <p><a href="${modelUrl}" download>Download Model</a></p>
+                                    </div>
+                                `;
+                            }
                         } else {
                             html += `<div class="media-item"><p>No 3D Model Available</p></div>`;
                         }
 
                         // Floorplan (JSON)
                         if (jsonUrl) {
-                            // Ensure segment.id exists. If not, we might have an issue, but we'll assume it does or handle it.
                             const containerId = segment.id ? `floorplan-${segment.id}` : `floorplan-random-${Math.random().toString(36).substr(2, 9)}`;
 
                             html += `
@@ -228,23 +412,15 @@
                     }
                 }
 
-                // ... (Images logic)
-
                 contentDiv.innerHTML = html;
 
                 // Execute Floorplan renders
                 if (session.segments) {
-                    // Re-import to be safe or use the one from above scope if available
-                    // We already imported it above, so we can use 'generateFloorplanSvg'
-
                     for (const segment of session.segments) {
                         const jsonUrl = await resolveUrl(segment.roomPlanJSONRemoteURL);
                         if (jsonUrl) {
                             const container = document.getElementById(`floorplan-${segment.id}`);
                             if (container) {
-                                // Clear loading text
-                                // container.innerHTML = 'Rendering...'; 
-
                                 fetch(jsonUrl)
                                     .then(res => res.arrayBuffer()) // Get as buffer to handle Zip or Text
                                     .then(async buffer => {
@@ -263,8 +439,7 @@
                                                 jsonData = JSON.parse(content);
                                             }
                                         } catch (e) {
-                                            // Not a zip, or failed to unzip
-                                            console.log('Not a zip file, trying raw JSON parse...');
+                                            console.warn('JSZip load failed or not zip:', e);
                                         }
 
                                         // Fallback: Try parsing buffer as text directly
@@ -282,21 +457,7 @@
                                         // Initialize Pan/Zoom
                                         const svgElement = container.querySelector('svg');
                                         if (svgElement && window.svgPanZoom) {
-                                            // Ensure container has overflow hidden for clean clipping
                                             container.style.overflow = 'hidden';
-
-                                            // We need to wait a tick for DOM? Usually immediate is fine.
-                                            // Note: svg-pan-zoom requires the ID of element or the element itself.
-                                            // Also, since we have scale(1, -1) on the SVG for coordinate system,
-                                            // we need to be careful. svg-pan-zoom modifies the viewport transform.
-                                            // Our generateFloorplanSvg wraps content in <g id="viewport"> which is good for 
-                                            // the library as 'viewportSelector'.
-
-                                            // However, the SVG itself has `transform: scale(1, -1)` in style.
-                                            // This might conflict with the library's matrix controls if not careful.
-                                            // Better approach: wrap the svg content in a group that handles the flip, 
-                                            // and let pan-zoom handle the outer group?
-                                            // Actually, simplest is to let the library handle the viewport.
 
                                             svgPanZoom(svgElement, {
                                                 zoomEnabled: true,
@@ -314,15 +475,13 @@
                                             controlsDiv.style.bottom = '10px';
                                             controlsDiv.style.left = '10px';
                                             controlsDiv.style.zIndex = '100';
-                                            controlsDiv.style.display = 'flex';
+                                            controlsDiv.style.display = 'none'; // User requested to hide slider
                                             controlsDiv.style.alignItems = 'center';
                                             controlsDiv.style.gap = '10px';
                                             controlsDiv.style.background = 'rgba(255, 255, 255, 0.9)';
                                             controlsDiv.style.padding = '8px';
                                             controlsDiv.style.borderRadius = '20px';
                                             controlsDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-
-                                            // Make container relative so we can position controls
                                             container.style.position = 'relative';
 
                                             controlsDiv.innerHTML = `
@@ -336,7 +495,6 @@
                                             const dial = document.getElementById(`dial-rotate-${segment.id}`);
                                             const label = document.getElementById(`rotate-val-${segment.id}`);
 
-                                            // Apply transform to SVG element
                                             const updateTransform = () => {
                                                 svgElement.style.transition = 'transform 0.1s ease-out';
                                                 svgElement.style.transform = `rotate(${currentRotation}deg)`;
@@ -349,7 +507,6 @@
                                                     label.innerText = `${currentRotation}°`;
                                                     updateTransform();
                                                 });
-
                                                 dial.addEventListener('mousedown', (e) => e.stopPropagation());
                                                 dial.addEventListener('mousemove', (e) => e.stopPropagation());
                                             }

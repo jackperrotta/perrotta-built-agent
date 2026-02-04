@@ -11,7 +11,7 @@
     "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
     "start": "npx tsx apps/backend/src/main.ts",
     "dev:backend": "npm run dev --workspace=apps/backend",
-    "dev:web": "npm run start --workspace=apps/web",
+    "dev:web": "node apps/web/server.js",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\""
   },
   "dependencies": {
