@@ -11,7 +11,8 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static frontend files
-app.use(express.static(path.resolve('apps/web')));
+// Serve static frontend files (with .html extension resolution)
+app.use(express.static(path.resolve('apps/web'), { extensions: ['html'] }));
 
 import sessionsRouter from './routes/sessions.js';
 import uploadRouter from './routes/upload.js';
