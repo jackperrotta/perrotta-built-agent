@@ -1,5 +1,12 @@
 export class MockFirestore {
-    private data: Record<string, Record<string, any>> = {};
+    private data: Record<string, Record<string, any>> = {
+        users: {
+            'jperrotta-uid': {
+                role: 'admin',
+                email: 'jperrotta521@gmail.com'
+            }
+        }
+    };
 
     collection(name: string) {
         return {
@@ -55,6 +62,10 @@ export class MockAuth {
         if (token === 'mock-token') {
             return { uid: 'mock-user', email: 'mock@example.com' };
         }
+        if (token === 'mock-token-admin') {
+            return { uid: 'jperrotta-uid', email: 'jperrotta521@gmail.com' };
+        }
         throw new Error('Invalid token');
     }
 }
+

@@ -16,10 +16,12 @@ app.use(express.static(path.resolve('apps/web')));
 import sessionsRouter from './routes/sessions.js';
 import uploadRouter from './routes/upload.js';
 import docsRouter from './routes/docs.js';
+import adminRouter from './routes/admin.js';
 
 app.use('/api/docs', docsRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/admin', adminRouter);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

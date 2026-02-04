@@ -62,6 +62,13 @@ The repository is organized as an npm workspace:
 -   **Authentication**: Bearer Token middleware integrated with Firebase Auth.
 -   **API Documentation**: Live documentation endpoint at `/api/docs`.
 -   **Unified Serving**: Backend service hosts the Frontend static files for simple single-service deployment.
+-   **Interactive Floorplan Visualization**:
+    -   **Custom Parser**: In-browser conversion of Apple RoomPlan JSON (`.json` or `.zip`) to schematic SVG floorplans.
+    -   **Smart Rendering**: 
+        -   Calculates **Square Footage** using polygon geometry (Shoelace formula).
+        -   Intelligent **Dimension Placement**: Exterior walls with outward-facing labels, interior windows with inward-facing labels to prevent overlap.
+        -   **Visual Enhancements**: Door swing arcs, text halos for legibility, and architectural styling.
+    -   **Interactive Controls**: CAD-like Pan/Zoom and a 360° Rotation Dial for orientation adjustment.
 
 ## 🚀 Getting Started
 

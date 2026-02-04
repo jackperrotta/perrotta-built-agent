@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            background-color: #f4f4f9;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        button#logout-btn {
+            padding: 8px 16px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+
+        pre {
+            background: #eee;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Admin Dashboard</h1>
+        <button id="logout-btn">Logout</button>
+    </header>
+
+    <div class="card">
+        <h2>User Info</h2>
+        <div id="user-info">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>Scan Sessions</h2>
+        <div id="backend-status">Checking...</div>
+    </div>
+
+    <script type="module">
+        import { logout, onAuthChange, getToken } from '../src/auth.js';
+        import { getSessions } from '../src/services/sessionService.js';
+
+        const userInfoDiv = document.getElementById('user-info');
+        const backendStatusDiv = document.getElementById('backend-status');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        logoutBtn.addEventListener('click', logout);
+
+        onAuthChange(async (user) => {
+            if (!user) {
+                window.location.href = '/admin/login.html';
+                return;
+            }
+
+            userInfoDiv.innerHTML = `
+                <p><strong>Email:</strong> ${user.email}</p>
+                <p><strong>UID:</strong> ${user.uid}</p>
+            `;
+
+            loadSessions();
+        });
+
+        async function loadSessions() {
+            try {
+                const sessions = await getSessions();
+
+                if (sessions.length === 0) {
+                    backendStatusDiv.innerHTML = '<p>No sessions found.</p>';
+                    return;
+                }
+
+                const tableHtml = `
+                    <table border="1" style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr>
+                                <th style="padding: 8px;">ID</th>
+                                <th style="padding: 8px;">Created At</th>
+                                <th style="padding: 8px;">Segments</th>
+                                <th style="padding: 8px;">Audio</th>
+                                <th style="padding: 8px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sessions.map(s => `
+                                <tr>
+                                    <td style="padding: 8px;">${s.id}</td>
+                                    <td style="padding: 8px;">${new Date(s.createdAt).toLocaleString()}</td>
+                                    <td style="padding: 8px;">${s.segments ? s.segments.length : 0}</td>
+                                    <td style="padding: 8px;">${s.audioRecordingUrl ? '✅' : '❌'}</td>
+                                    <td style="padding: 8px;">
+                                        <a href="/admin/scan-sessions/view?id=${s.id}">View Details</a>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                backendStatusDiv.innerHTML = tableHtml;
+
+            } catch (error) {
+                backendStatusDiv.innerHTML = `<p style="color: red">Error loading sessions: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+
+</html>

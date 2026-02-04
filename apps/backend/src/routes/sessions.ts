@@ -76,7 +76,10 @@ router.get('/:id', verifyToken, async (req: AuthenticatedRequest, res: Response)
             return res.status(404).json({ error: 'Session not found' });
         }
 
-        res.json(doc.data() as ScanSession);
+        const data = doc.data() as ScanSession;
+
+
+        res.json(data);
     } catch (error) {
         console.error('Error fetching session:', error);
         res.status(500).json({ error: 'Internal Server Error' });

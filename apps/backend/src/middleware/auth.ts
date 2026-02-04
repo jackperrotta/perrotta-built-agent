@@ -1,10 +1,12 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { auth } from '../config/firebase.js';
+import { getUserRole } from '../services/userService.js';
 
 export interface AuthenticatedRequest extends Request {
     user?: {
         uid: string;
         email?: string;
+        role?: string;
     };
 }
 
@@ -20,19 +22,37 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response, next
 
     const token = authHeader.split('Bearer ')[1];
 
+    // Mock Token Handling
     if (token === 'mock-token') {
+        const mockUid = 'test-user-id';
+        const role = await getUserRole(mockUid); // Will fetch from mock DB if configured
+
         req.user = {
-            uid: 'test-user-id',
-            email: 'test@example.com'
+            uid: mockUid,
+            email: 'test@example.com',
+            role: role
+        };
+        return next();
+    }
+
+    // Explicit Admin Mock for Developers
+    if (token === 'mock-token-admin') {
+        req.user = {
+            uid: 'jperrotta-uid',
+            email: 'jperrotta521@gmail.com',
+            role: 'admin'
         };
         return next();
     }
 
     try {
         const decodedToken = await auth.verifyIdToken(token);
+        const role = await getUserRole(decodedToken.uid);
+
         req.user = {
             uid: decodedToken.uid,
-            email: decodedToken.email
+            email: decodedToken.email,
+            role: role
         };
         next();
     } catch (error) {
