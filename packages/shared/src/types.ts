@@ -53,6 +53,57 @@ export interface Stairway {
     stepCountEstimate: number;
 }
 
+export type GeneratedLayoutStrategy = 'master_bath_priority';
+
+export type GeneratedRoomType =
+    | 'Bedroom'
+    | 'Bathroom'
+    | 'Kitchen'
+    | 'Living'
+    | 'Dining'
+    | 'Hall'
+    | 'Laundry'
+    | 'Closet';
+
+export type GeneratedRoomFloor = 'FirstFloor' | 'SecondFloor' | 'Basement' | 'Attic';
+
+export interface GeneratedLayoutRoomBounds {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+export interface GeneratedLayoutRoom {
+    id: string;
+    type: GeneratedRoomType;
+    floor: GeneratedRoomFloor;
+    bounds: GeneratedLayoutRoomBounds;
+    areaSqFt?: number;
+    isPrimary?: boolean;
+}
+
+export interface GeneratedLayoutSummary {
+    bedrooms: number;
+    bathrooms: number;
+    floorCount: number;
+    totalAreaSqFt?: number;
+}
+
+export interface GeneratedLayoutArtifacts {
+    layoutJsonUrl: string;
+    floorplanSvgUrl?: string;
+    modelUrl?: string;
+}
+
+export interface GeneratedLayout {
+    version: number;
+    createdAt: number;
+    strategy: GeneratedLayoutStrategy;
+    summary: GeneratedLayoutSummary;
+    artifacts: GeneratedLayoutArtifacts;
+}
+
 export interface ScanSession {
     id: string;
     createdAt: number; // Timestamp
@@ -60,6 +111,7 @@ export interface ScanSession {
     capturedImages: CapturedImage[];
     stairways: Stairway[];
     audioRecordingUrl?: string;
+    generatedLayout?: GeneratedLayout;
 }
 
 // API Request/Response Types

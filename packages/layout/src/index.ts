@@ -3,6 +3,7 @@ import { type Point } from '@construction/geometry';
 
 export * from './roomPlanTypes.js';
 export * from './floorplanGenerator.js';
+export * from './generatedLayout.js';
 
 export interface LayoutProposal {
     id: string;

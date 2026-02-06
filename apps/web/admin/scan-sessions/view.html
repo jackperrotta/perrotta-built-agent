@@ -90,6 +90,48 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
+        .action-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.75rem;
+        }
+
+        .primary-button {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #007bff;
+            background: #007bff;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .primary-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .danger-button {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #dc3545;
+            background: #dc3545;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .danger-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            color: #555;
+        }
     </style>
 </head>
 
@@ -103,7 +145,7 @@
 
     <script type="module">
         import { onAuthChange } from '../../src/auth.js';
-        import { getSessionById } from '../../src/services/sessionService.js';
+        import { getSessionById, generateLayoutForSession, deleteGeneratedLayoutForSession } from '../../src/services/sessionService.js';
         import { storage } from '../../src/config/firebase-config.js';
         import { ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
         import { generateFloorplanSvg } from '../../src/utils/floorplan-parser.js';
@@ -288,6 +330,436 @@
             }
         }
 
+        function extractRoomPlanWalls(data) {
+            if (!data?.walls) return [];
+            const lines = [];
+            data.walls.forEach(wall => {
+                if (!wall.transform || !wall.dimensions) return;
+                const mat = wall.transform;
+                const width = wall.dimensions[0];
+                const tx = mat[12];
+                const tz = mat[14];
+                const rx = mat[0];
+                const rz = mat[2];
+                const halfLen = width / 2;
+                const x1 = tx - halfLen * rx;
+                const y1 = tz - halfLen * rz;
+                const x2 = tx + halfLen * rx;
+                const y2 = tz + halfLen * rz;
+                lines.push({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 } });
+            });
+            return lines;
+        }
+
+        function localToWorld(point, origin, rotation) {
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+            return {
+                x: origin.x + point.x * cos - point.y * sin,
+                y: origin.y + point.x * sin + point.y * cos
+            };
+        }
+
+        function computeRoomPlanRotation(roomPlanData) {
+            if (!roomPlanData?.walls) return 0;
+            let sumSin = 0;
+            let sumCos = 0;
+            roomPlanData.walls.forEach(wall => {
+                if (!wall.transform || !wall.dimensions) return;
+                const mat = wall.transform;
+                const width = wall.dimensions[0];
+                const tx = mat[12];
+                const tz = mat[14];
+                const rx = mat[0];
+                const rz = mat[2];
+                const halfLen = width / 2;
+                const x1 = tx - halfLen * rx;
+                const y1 = tz - halfLen * rz;
+                const x2 = tx + halfLen * rx;
+                const y2 = tz + halfLen * rz;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const len = Math.hypot(dx, dy);
+                if (!len) return;
+                const angle = Math.atan2(dy, dx);
+                sumSin += len * Math.sin(4 * angle);
+                sumCos += len * Math.cos(4 * angle);
+            });
+            if (sumCos === 0 && sumSin === 0) return 0;
+            const dominantAngle = Math.atan2(sumSin, sumCos) / 4;
+            return -dominantAngle;
+        }
+
+        function rotatePoint(point, rotation) {
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+            return {
+                x: point.x * cos - point.y * sin,
+                y: point.x * sin + point.y * cos
+            };
+        }
+
+        function traceExteriorPolygon(lines, snapTolerance = 0.2) {
+            if (!lines || lines.length === 0) return null;
+
+            const nodes = [];
+            const edges = [];
+
+            const getNodeIndex = (point) => {
+                const existingIndex = nodes.findIndex(node => {
+                    const dx = node.x - point.x;
+                    const dy = node.y - point.y;
+                    return Math.hypot(dx, dy) <= snapTolerance;
+                });
+                if (existingIndex >= 0) return existingIndex;
+                nodes.push({ x: point.x, y: point.y });
+                return nodes.length - 1;
+            };
+
+            lines.forEach(line => {
+                const a = getNodeIndex(line.start);
+                const b = getNodeIndex(line.end);
+                if (a !== b) edges.push({ a, b });
+            });
+
+            const adjacency = nodes.map(() => []);
+            edges.forEach((edge, idx) => {
+                adjacency[edge.a].push({ edgeIndex: idx, other: edge.b });
+                adjacency[edge.b].push({ edgeIndex: idx, other: edge.a });
+            });
+
+            if (nodes.length < 3) return null;
+
+            const startNode = nodes.reduce((best, node, idx) => {
+                if (!best) return { idx, node };
+                if (node.x < best.node.x || (node.x === best.node.x && node.y < best.node.y)) {
+                    return { idx, node };
+                }
+                return best;
+            }, null);
+
+            if (!startNode) return null;
+
+            const exteriorNodeIndices = [];
+            const startIdx = startNode.idx;
+            let currentIdx = startIdx;
+            let prevAngle = Math.PI;
+            let prevEdge = -1;
+
+            for (let step = 0; step < edges.length * 3; step += 1) {
+                exteriorNodeIndices.push(currentIdx);
+                const options = adjacency[currentIdx].filter(option => option.edgeIndex !== prevEdge || adjacency[currentIdx].length === 1);
+                if (options.length === 0) break;
+
+                let bestOption = options[0];
+                let bestDelta = Infinity;
+
+                options.forEach(option => {
+                    const nextNode = nodes[option.other];
+                    const currentNode = nodes[currentIdx];
+                    const angle = Math.atan2(nextNode.y - currentNode.y, nextNode.x - currentNode.x);
+                    const delta = (prevAngle - angle + Math.PI * 2) % (Math.PI * 2);
+                    if (delta < bestDelta) {
+                        bestDelta = delta;
+                        bestOption = option;
+                    }
+                });
+
+                prevEdge = bestOption.edgeIndex;
+                prevAngle = Math.atan2(nodes[bestOption.other].y - nodes[currentIdx].y, nodes[bestOption.other].x - nodes[currentIdx].x);
+                currentIdx = bestOption.other;
+
+                if (currentIdx === startIdx && exteriorNodeIndices.length > 2) break;
+            }
+
+            if (exteriorNodeIndices.length < 3) return null;
+
+            return exteriorNodeIndices.map(idx => nodes[idx]);
+        }
+
+        function overlayGeneratedRooms(svgString, layoutModel, roomPlanRotation, exteriorPolygon) {
+            if (!layoutModel?.rooms) return svgString;
+            const origin = layoutModel.origin || { x: 0, y: 0 };
+            const rotation = layoutModel.rotationRad || 0;
+
+            const roomPolygons = layoutModel.rooms.map(room => {
+                const points = [
+                    { x: room.bounds.minX, y: room.bounds.minY },
+                    { x: room.bounds.maxX, y: room.bounds.minY },
+                    { x: room.bounds.maxX, y: room.bounds.maxY },
+                    { x: room.bounds.minX, y: room.bounds.maxY }
+                ]
+                    .map(point => localToWorld(point, origin, rotation))
+                    .map(point => rotatePoint(point, roomPlanRotation));
+                const pointString = points.map(point => `${point.x},${point.y}`).join(' ');
+                const label = room.type || 'Room';
+                const center = rotatePoint(localToWorld({
+                    x: (room.bounds.minX + room.bounds.maxX) / 2,
+                    y: (room.bounds.minY + room.bounds.maxY) / 2
+                }, origin, rotation), roomPlanRotation);
+                return `
+                    <polygon points="${pointString}" fill="rgba(255, 226, 154, 0.25)" stroke="#c48b2c" stroke-width="0.05" />
+                    <text x="${center.x}" y="${center.y}" font-size="0.35" text-anchor="middle" dominant-baseline="middle" fill="#7a4f00">${label}</text>
+                `;
+            }).join('\n');
+
+            if (!exteriorPolygon || exteriorPolygon.length < 3) {
+                return svgString.replace('</svg>', `<g id="generated-interior">${roomPolygons}</g></svg>`);
+            }
+
+            const exteriorPoints = exteriorPolygon.map(point => `${point.x},${point.y}`).join(' ');
+
+            const mask = `
+                <g id="generated-exterior-mask">
+                    <polygon points="${exteriorPoints}" fill="#ffffff" stroke="none" />
+                </g>
+                <g id="generated-exterior-outline">
+                    <polygon points="${exteriorPoints}" fill="none" stroke="#111" stroke-width="0.08" />
+                </g>
+            `;
+
+            const clip = `
+                <clipPath id="generated-clip">
+                    <polygon points="${exteriorPoints}" />
+                </clipPath>
+            `;
+
+            return svgString.replace('</svg>', `${clip}${mask}<g id="generated-interior" clip-path="url(#generated-clip)">${roomPolygons}</g></svg>`);
+        }
+
+        async function initGeneratedLayoutViewer(containerId, layoutModel, roomPlanData, exteriorPolygon) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            try {
+                const THREE = await import('three');
+                const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+
+                container.innerHTML = '';
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf7f7f7);
+
+                const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+                camera.position.set(0, 8, 10);
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+
+                const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
+                scene.add(hemiLight);
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                dirLight.position.set(4, 6, 3);
+                scene.add(dirLight);
+
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                const palette = {
+                    Bedroom: 0x9bb7ff,
+                    Bathroom: 0xffd1dc,
+                    Kitchen: 0xffe29a,
+                    Living: 0xc9f2c7,
+                    Dining: 0xf5e1c8,
+                    Hall: 0xdcdcdc,
+                    Laundry: 0xe0d4ff,
+                    Closet: 0xf0f0f0
+                };
+
+                const rooms = layoutModel?.rooms || [];
+                const group = new THREE.Group();
+
+                rooms.forEach(room => {
+                    const width = room.bounds.maxX - room.bounds.minX;
+                    const depth = room.bounds.maxY - room.bounds.minY;
+                    const height = 2.7;
+                    const geometry = new THREE.BoxGeometry(width, height, depth);
+                    const material = new THREE.MeshStandardMaterial({ color: palette[room.type] || 0xcccccc });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    const origin = layoutModel?.origin || { x: 0, y: 0 };
+                    const rotation = layoutModel?.rotationRad || 0;
+                    const cos = Math.cos(rotation);
+                    const sin = Math.sin(rotation);
+                    const localCenter = {
+                        x: room.bounds.minX + width / 2,
+                        y: room.bounds.minY + depth / 2
+                    };
+                    const worldX = origin.x + localCenter.x * cos - localCenter.y * sin;
+                    const worldZ = origin.y + localCenter.x * sin + localCenter.y * cos;
+                    mesh.position.set(worldX, height / 2, worldZ);
+                    mesh.rotation.y = -rotation;
+                    group.add(mesh);
+                });
+
+                scene.add(group);
+
+                let exteriorWalls = layoutModel?.exteriorWalls || [];
+                if (exteriorPolygon && exteriorPolygon.length > 2) {
+                    exteriorWalls = exteriorPolygon.map((point, idx) => {
+                        const next = exteriorPolygon[(idx + 1) % exteriorPolygon.length];
+                        return { start: point, end: next };
+                    });
+                } else if (roomPlanData) {
+                    exteriorWalls = extractRoomPlanWalls(roomPlanData);
+                }
+                if (exteriorWalls.length > 0) {
+                    const wallGroup = new THREE.Group();
+                    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+                    const wallThickness = 0.12;
+                    const wallHeight = 3.0;
+
+                    exteriorWalls.forEach(wall => {
+                        const start = new THREE.Vector3(wall.start.x, 0, wall.start.y);
+                        const end = new THREE.Vector3(wall.end.x, 0, wall.end.y);
+                        const length = start.distanceTo(end);
+                        const geometry = new THREE.BoxGeometry(length, wallHeight, wallThickness);
+                        const mesh = new THREE.Mesh(geometry, wallMaterial);
+                        const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                        mesh.position.set(center.x, wallHeight / 2, center.z);
+                        const angle = Math.atan2(end.z - start.z, end.x - start.x);
+                        mesh.rotation.y = -angle;
+                        wallGroup.add(mesh);
+                    });
+
+                    scene.add(wallGroup);
+                }
+
+                const box = new THREE.Box3().setFromObject(group);
+                if (!box.isEmpty()) {
+                    const size = box.getSize(new THREE.Vector3());
+                    const center = box.getCenter(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const fitHeightDistance = maxDim / (2 * Math.atan(Math.PI * camera.fov / 360));
+                    const fitWidthDistance = fitHeightDistance / camera.aspect;
+                    const distance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance);
+                    camera.position.set(center.x, center.y + maxDim, center.z + distance);
+                    controls.target.copy(center);
+                }
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    if (container && container.clientWidth > 0) {
+                        camera.aspect = container.clientWidth / container.clientHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(container.clientWidth, container.clientHeight);
+                    }
+                });
+            } catch (err) {
+                console.error('Generated layout viewer init failed', err);
+                container.innerHTML = `<p style='color:red;'>Generated layout viewer error: ${err.message}</p>`;
+            }
+        }
+
+        function setDebugText(elementId, data) {
+            const target = document.getElementById(elementId);
+            if (!target) return;
+            if (!data) {
+                target.textContent = 'No data available.';
+                return;
+            }
+            const text = JSON.stringify(data, null, 2);
+            const maxLength = 20000;
+            target.textContent = text.length > maxLength
+                ? `${text.slice(0, maxLength)}\n\n... (truncated)`
+                : text;
+        }
+
+        async function renderGeneratedLayout(generatedLayout, session) {
+            const statusEl = document.getElementById('generated-layout-status');
+            const modelContainer = document.getElementById('generated-model-container');
+            const floorplanContainer = document.getElementById('generated-floorplan-container');
+
+            if (!generatedLayout || !generatedLayout.artifacts?.layoutJsonUrl) {
+                if (statusEl) statusEl.textContent = 'No generated layout yet.';
+                if (modelContainer) modelContainer.innerHTML = '<p>No 3D layout available.</p>';
+                if (floorplanContainer) floorplanContainer.innerHTML = '<p>No generated floorplan available.</p>';
+                return;
+            }
+
+            if (statusEl) {
+                const summary = generatedLayout.summary
+                    ? `${generatedLayout.summary.bedrooms} bed / ${generatedLayout.summary.bathrooms} bath`
+                    : 'Summary unavailable';
+                statusEl.textContent = `Generated ${new Date(generatedLayout.createdAt).toLocaleString()} (${summary})`;
+            }
+
+            try {
+                const layoutResponse = await fetch(generatedLayout.artifacts.layoutJsonUrl);
+                const layoutModel = await layoutResponse.json();
+                const roomPlanUrl = session?.segments?.find(segment => segment.roomPlanJSONRemoteURL)?.roomPlanJSONRemoteURL;
+                const resolvedRoomPlanUrl = await resolveUrl(roomPlanUrl);
+                let roomPlanData = null;
+                let roomPlanRotation = 0;
+                let exteriorPolygon = null;
+
+                if (resolvedRoomPlanUrl) {
+                    const roomPlanBuffer = await fetch(resolvedRoomPlanUrl).then(res => res.arrayBuffer());
+                    try {
+                        const zip = await JSZip.loadAsync(roomPlanBuffer);
+                        const jsonFilename = Object.keys(zip.files).find(name => name.toLowerCase().endsWith('.json') && !name.startsWith('__MACOSX'));
+                        if (jsonFilename) {
+                            const content = await zip.files[jsonFilename].async('string');
+                            roomPlanData = JSON.parse(content);
+                        }
+                    } catch (e) {
+                        const text = new TextDecoder().decode(roomPlanBuffer);
+                        roomPlanData = JSON.parse(text);
+                    }
+                }
+
+                if (modelContainer) {
+                    if (roomPlanData) {
+                        roomPlanRotation = computeRoomPlanRotation(roomPlanData);
+                        const lines = extractRoomPlanWalls(roomPlanData).map(line => ({
+                            start: rotatePoint(line.start, roomPlanRotation),
+                            end: rotatePoint(line.end, roomPlanRotation)
+                        }));
+                        exteriorPolygon = traceExteriorPolygon(lines);
+                    }
+                    await initGeneratedLayoutViewer('generated-model-container', layoutModel, roomPlanData, exteriorPolygon);
+                }
+
+                if (floorplanContainer) {
+                    if (roomPlanData) {
+                        const svgText = generateFloorplanSvg(roomPlanData);
+                        floorplanContainer.innerHTML = overlayGeneratedRooms(svgText, layoutModel, roomPlanRotation, exteriorPolygon);
+                    } else if (generatedLayout.artifacts.floorplanSvgUrl) {
+                        const svgResponse = await fetch(generatedLayout.artifacts.floorplanSvgUrl);
+                        const svgText = await svgResponse.text();
+                        floorplanContainer.innerHTML = overlayGeneratedRooms(svgText, layoutModel, 0, exteriorPolygon);
+                    } else {
+                        floorplanContainer.innerHTML = '<p>No generated floorplan available.</p>';
+                    }
+
+                    const svgElement = floorplanContainer.querySelector('svg');
+                    if (svgElement && window.svgPanZoom) {
+                        floorplanContainer.style.overflow = 'hidden';
+                        svgPanZoom(svgElement, {
+                            zoomEnabled: true,
+                            controlIconsEnabled: true,
+                            fit: true,
+                            center: true,
+                            minZoom: 0.1,
+                            maxZoom: 10
+                        });
+                    }
+                }
+
+                setDebugText('generated-layout-json', layoutModel);
+                setDebugText('generated-roomplan-json', roomPlanData);
+            } catch (error) {
+                console.error('Generated layout render error:', error);
+                if (statusEl) statusEl.textContent = `Failed to render generated layout: ${error.message}`;
+            }
+        }
+
         async function loadSessionDetails(id) {
             try {
                 const session = await getSessionById(id);
@@ -308,6 +780,39 @@
                             <p><strong>Audio Note:</strong></p>
                             <audio controls src="${session.audioRecordingUrl}"></audio>
                         ` : ''}
+                    </div>
+                `;
+
+                html += `
+                    <div class="card">
+                        <h2>Generated Layout</h2>
+                        <div class="action-row">
+                            <button id="generate-layout-btn" class="primary-button">Generate</button>
+                            <button id="delete-layout-btn" class="danger-button">Delete</button>
+                            <span id="generated-layout-status" class="status-text">Checking for generated layout...</span>
+                        </div>
+                        <div class="media-grid">
+                            <div class="media-item">
+                                <h4>Generated 3D Layout</h4>
+                                <div id="generated-model-container" style="width: 100%; height: 400px; background: #eee; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    Loading 3D layout...
+                                </div>
+                            </div>
+                            <div class="media-item">
+                                <h4>Generated Floorplan</h4>
+                                <div id="generated-floorplan-container" class="floorplan-container" style="height: 400px; width: 100%; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; background: #fff;">
+                                    Loading generated floorplan...
+                                </div>
+                            </div>
+                        </div>
+                        <details style="margin-top: 1rem;">
+                            <summary>Generated Layout Model</summary>
+                            <pre id="generated-layout-json" style="max-height: 240px; overflow: auto; background: #f7f7f7; padding: 0.75rem; border-radius: 6px;"></pre>
+                        </details>
+                        <details style="margin-top: 0.75rem;">
+                            <summary>RoomPlan JSON (Scan)</summary>
+                            <pre id="generated-roomplan-json" style="max-height: 240px; overflow: auto; background: #f7f7f7; padding: 0.75rem; border-radius: 6px;"></pre>
+                        </details>
                     </div>
                 `;
 
@@ -413,6 +918,50 @@
                 }
 
                 contentDiv.innerHTML = html;
+
+                const generateButton = document.getElementById('generate-layout-btn');
+                if (generateButton) {
+                    generateButton.addEventListener('click', async () => {
+                        generateButton.disabled = true;
+                        generateButton.textContent = 'Generating...';
+                        const statusEl = document.getElementById('generated-layout-status');
+                        if (statusEl) statusEl.textContent = 'Generating optimized layout...';
+
+                        try {
+                            await generateLayoutForSession(session.id);
+                            await loadSessionDetails(session.id);
+                            return;
+                        } catch (err) {
+                            if (statusEl) statusEl.textContent = `Generation failed: ${err.message}`;
+                        } finally {
+                            generateButton.disabled = false;
+                            generateButton.textContent = 'Generate';
+                        }
+                    });
+                }
+
+                const deleteButton = document.getElementById('delete-layout-btn');
+                if (deleteButton) {
+                    deleteButton.disabled = !session.generatedLayout;
+                    deleteButton.addEventListener('click', async () => {
+                        deleteButton.disabled = true;
+                        deleteButton.textContent = 'Deleting...';
+                        const statusEl = document.getElementById('generated-layout-status');
+                        if (statusEl) statusEl.textContent = 'Deleting generated layout...';
+
+                        try {
+                            await deleteGeneratedLayoutForSession(session.id);
+                            await loadSessionDetails(session.id);
+                            return;
+                        } catch (err) {
+                            if (statusEl) statusEl.textContent = `Delete failed: ${err.message}`;
+                        } finally {
+                            deleteButton.textContent = 'Delete';
+                        }
+                    });
+                }
+
+                await renderGeneratedLayout(session.generatedLayout, session);
 
                 // Execute Floorplan renders
                 if (session.segments) {
