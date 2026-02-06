@@ -237,7 +237,7 @@ const docsHtml = `
   "address": "string (required)",
   "projectType": "flip | remodel | addition | other (required)",
   "name": "string (optional, auto-derived if omitted)",
-  "addressLine1": "string (optional)",
+  "addressLine1": "string (optional, street line; commas trimmed)",
   "addressLine2": "string (optional)",
   "city": "string (optional)",
   "state": "string (optional)",
@@ -245,8 +245,8 @@ const docsHtml = `
   "country": "string (optional)",
   "status": "estimate | active | on_hold | completed | archived",
   "customerId": "string | null",
-  "startDate": "number (ms)",
-  "endDate": "number (ms)"
+  "startDate": "number (ms, integer)",
+  "endDate": "number (ms, integer)"
 }</pre>
         <h4>Request Body</h4>
         <pre>{
@@ -288,8 +288,8 @@ const docsHtml = `
     "projectType": "flip | remodel | addition | other",
     "status": "estimate | active | on_hold | completed | archived",
     "customerId": "string | null",
-    "startDate": "number (ms)",
-    "endDate": "number (ms)",
+  "startDate": "number (ms, integer)",
+  "endDate": "number (ms, integer)",
     "scanSessionIds": ["string"]
   }
 ]</pre>
@@ -315,8 +315,8 @@ const docsHtml = `
   "projectType": "flip | remodel | addition | other",
   "status": "estimate | active | on_hold | completed | archived",
   "customerId": "string | null",
-  "startDate": "number (ms)",
-  "endDate": "number (ms)",
+  "startDate": "number (ms, integer)",
+  "endDate": "number (ms, integer)",
   "scanSessionIds": ["string"]
 }</pre>
         <h4>Response</h4>
@@ -338,8 +338,8 @@ const docsHtml = `
   "projectType": "flip | remodel | addition | other",
   "status": "estimate | active | on_hold | completed | archived",
   "customerId": "string | null",
-  "startDate": "number (ms)",
-  "endDate": "number (ms)"
+  "startDate": "number (ms, integer)",
+  "endDate": "number (ms, integer)"
 }</pre>
         <h4>Request Body</h4>
         <pre>{ "address": "609 Gerritt St, Philadelphia", "projectType": "flip" }</pre>

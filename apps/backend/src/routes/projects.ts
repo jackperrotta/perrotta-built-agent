@@ -32,6 +32,17 @@ const parseAddress = (address: string) => {
     };
 };
 
+const normalizeAddressLine1 = (value?: string) => {
+    if (!value) return value;
+    return value.split(',')[0]?.trim() || value.trim();
+};
+
+const normalizeTimestamp = (value?: number) => {
+    if (value === undefined || value === null) return undefined;
+    if (!Number.isFinite(value)) return undefined;
+    return Math.trunc(value);
+};
+
 const deriveProjectName = (address: string, projectType: Project['projectType']) => {
     const parsed = parseAddress(address);
     const street = parsed.addressLine1 || address.trim();
@@ -45,12 +56,13 @@ const buildProject = (payload: Partial<Project>, projectId: string): Project => 
     const projectType = payload.projectType ?? 'other';
     const name = payload.name?.trim() || deriveProjectName(address, projectType);
     const parsed = parseAddress(address);
+    const normalizedLine1 = normalizeAddressLine1(payload.addressLine1 ?? parsed.addressLine1);
 
     return {
         id: projectId,
         name,
         address,
-        addressLine1: payload.addressLine1 ?? parsed.addressLine1,
+        addressLine1: normalizedLine1,
         addressLine2: payload.addressLine2,
         city: payload.city ?? parsed.city,
         state: payload.state ?? parsed.state,
@@ -59,12 +71,18 @@ const buildProject = (payload: Partial<Project>, projectId: string): Project => 
         projectType,
         customerId: payload.customerId,
         status: payload.status ?? 'active',
-        startDate: payload.startDate,
-        endDate: payload.endDate,
+        startDate: normalizeTimestamp(payload.startDate),
+        endDate: normalizeTimestamp(payload.endDate),
         scanSessionIds: payload.scanSessionIds ?? [],
         createdAt: payload.createdAt ?? now,
         updatedAt: now
     };
+};
+
+const removeUndefined = <T extends Record<string, unknown>>(data: T): T => {
+    return Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
+    ) as T;
 };
 
 // GET /api/projects
@@ -86,14 +104,20 @@ router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =
         if (!body.address || !body.projectType) {
             return res.status(400).json({ error: 'Project address and projectType are required.' });
         }
+        if (body.startDate !== undefined && !Number.isFinite(body.startDate)) {
+            return res.status(400).json({ error: 'startDate must be a number (ms).' });
+        }
+        if (body.endDate !== undefined && !Number.isFinite(body.endDate)) {
+            return res.status(400).json({ error: 'endDate must be a number (ms).' });
+        }
 
         const projectId = body.id || crypto.randomUUID();
         const project = buildProject(body, projectId);
-        await projectsCollection.doc(projectId).set(project);
+        await projectsCollection.doc(projectId).set(removeUndefined(project));
         res.json({ status: 'success', project });
     } catch (error) {
         console.error('Error creating project:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
     }
 });
 
@@ -116,6 +140,12 @@ router.put('/:id', verifyToken, async (req: AuthenticatedRequest, res: Response)
     try {
         const body = req.body as Partial<Project>;
         const projectId = req.params.id;
+        if (body.startDate !== undefined && !Number.isFinite(body.startDate)) {
+            return res.status(400).json({ error: 'startDate must be a number (ms).' });
+        }
+        if (body.endDate !== undefined && !Number.isFinite(body.endDate)) {
+            return res.status(400).json({ error: 'endDate must be a number (ms).' });
+        }
         const docRef = projectsCollection.doc(projectId);
         const doc = await docRef.get();
         if (!doc.exists) {
@@ -128,22 +158,29 @@ router.put('/:id', verifyToken, async (req: AuthenticatedRequest, res: Response)
         const nextName = body.name ?? existing.name;
         const shouldAutoName = !body.name && (body.address || body.projectType);
         const parsed = body.address ? parseAddress(body.address) : undefined;
+        const normalizedLine1 = normalizeAddressLine1(
+            body.addressLine1 ?? parsed?.addressLine1 ?? existing.addressLine1
+        );
 
-        await docRef.update({
+        const updatePayload = removeUndefined({
             ...body,
             id: projectId,
             name: shouldAutoName ? deriveProjectName(nextAddress, nextType) : nextName,
-            addressLine1: body.addressLine1 ?? parsed?.addressLine1 ?? existing.addressLine1,
+            addressLine1: normalizedLine1,
             city: body.city ?? parsed?.city ?? existing.city,
             state: body.state ?? parsed?.state ?? existing.state,
             postalCode: body.postalCode ?? parsed?.postalCode ?? existing.postalCode,
+            startDate: normalizeTimestamp(body.startDate ?? existing.startDate),
+            endDate: normalizeTimestamp(body.endDate ?? existing.endDate),
             updatedAt: Date.now()
         });
+
+        await docRef.update(updatePayload);
         const updated = (await docRef.get()).data() as Project;
         res.json({ status: 'success', project: updated });
     } catch (error) {
         console.error('Error updating project:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
     }
 });
 
