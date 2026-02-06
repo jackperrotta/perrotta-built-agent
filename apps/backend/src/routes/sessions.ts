@@ -7,6 +7,14 @@ const router = Router();
 const sessionsCollection = db.collection('sessions');
 const projectsCollection = db.collection('projects');
 
+const removeUndefined = <T extends Record<string, unknown>>(data: T): T => {
+    return Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
+    ) as T;
+};
+
+const isNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
+
 // POST /api/sessions: Create or Update Session
 router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -15,6 +23,18 @@ router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =
         if (!sessionData.id) {
             return res.status(400).json({ error: 'Session ID is required' });
         }
+        if (!isNumber(sessionData.createdAt)) {
+            return res.status(400).json({ error: 'createdAt must be a number (ms).' });
+        }
+        if (!Array.isArray(sessionData.segments)) {
+            return res.status(400).json({ error: 'segments must be an array.' });
+        }
+        if (!Array.isArray(sessionData.capturedImages)) {
+            return res.status(400).json({ error: 'capturedImages must be an array.' });
+        }
+        if (!Array.isArray(sessionData.stairways)) {
+            return res.status(400).json({ error: 'stairways must be an array.' });
+        }
 
         // Ensure session creator is linked to the authenticated user
         const userId = req.user?.uid;
@@ -22,17 +42,18 @@ router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =
         // Add metadata if new
         const docRef = sessionsCollection.doc(sessionData.id);
         const doc = await docRef.get();
+        const sanitizedSession = removeUndefined(sessionData as unknown as Record<string, unknown>);
 
         if (!doc.exists) {
             await docRef.set({
-                ...sessionData,
+                ...sanitizedSession,
                 creatorId: userId,
                 createdAt: sessionData.createdAt || Date.now(),
                 updatedAt: Date.now()
             });
         } else {
             await docRef.update({
-                ...sessionData,
+                ...sanitizedSession,
                 updatedAt: Date.now()
             });
         }
@@ -60,7 +81,9 @@ router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =
         res.json(response);
     } catch (error) {
         console.error('Error saving session:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({
+            error: error instanceof Error ? error.message : 'Internal Server Error'
+        });
     }
 });
 
