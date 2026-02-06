@@ -7,7 +7,6 @@ import {
     type JournalEntry,
     type ProfitLossReport,
     type BalanceSheetReport,
-    type Project,
     type AccountingImport,
     type BankTransaction,
     type CategorizationRule,
@@ -19,7 +18,6 @@ import { generateSignedUploadUrl } from '../services/storage.js';
 const router = Router();
 const accountsCollection = db.collection('accounts');
 const journalEntriesCollection = db.collection('journalEntries');
-const projectsCollection = db.collection('projects');
 const importsCollection = db.collection('imports');
 const transactionsCollection = db.collection('transactions');
 const rulesCollection = db.collection('rules');
@@ -321,19 +319,6 @@ const fetchJournalEntries = async () => {
     return snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as JournalEntry);
 };
 
-const buildProject = (payload: Partial<Project>, projectId: string): Project => {
-    const now = Date.now();
-    return {
-        id: projectId,
-        name: payload.name || 'Untitled Project',
-        customerId: payload.customerId,
-        status: payload.status ?? 'active',
-        startDate: payload.startDate,
-        endDate: payload.endDate,
-        createdAt: payload.createdAt ?? now,
-        updatedAt: now
-    };
-};
 
 // POST /api/accounting/accounts/seed
 router.post('/accounts/seed', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
@@ -461,94 +446,6 @@ router.delete('/accounts/:id', verifyToken, async (req: AuthenticatedRequest, re
     }
 });
 
-// GET /api/accounting/projects
-router.get('/projects', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const snapshot = await projectsCollection.orderBy('createdAt', 'desc').get();
-        const projects = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Project);
-        res.json(projects);
-    } catch (error) {
-        console.error('Error listing projects:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// POST /api/accounting/projects
-router.post('/projects', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const body = req.body as Partial<Project>;
-        if (!body.name) {
-            return res.status(400).json({ error: 'Project name is required.' });
-        }
-
-        const projectId = body.id || crypto.randomUUID();
-        const project = buildProject(body, projectId);
-        await projectsCollection.doc(projectId).set(project);
-        res.json({ status: 'success', project });
-    } catch (error) {
-        console.error('Error creating project:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// GET /api/accounting/projects/:id
-router.get('/projects/:id', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const doc = await projectsCollection.doc(req.params.id).get();
-        if (!doc.exists) {
-            return res.status(404).json({ error: 'Project not found.' });
-        }
-        res.json(doc.data() as Project);
-    } catch (error) {
-        console.error('Error fetching project:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// PUT /api/accounting/projects/:id
-router.put('/projects/:id', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const body = req.body as Partial<Project>;
-        const projectId = req.params.id;
-        const docRef = projectsCollection.doc(projectId);
-        const doc = await docRef.get();
-        if (!doc.exists) {
-            return res.status(404).json({ error: 'Project not found.' });
-        }
-
-        await docRef.update({
-            ...body,
-            id: projectId,
-            updatedAt: Date.now()
-        });
-        const updated = (await docRef.get()).data() as Project;
-        res.json({ status: 'success', project: updated });
-    } catch (error) {
-        console.error('Error updating project:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// DELETE /api/accounting/projects/:id (soft archive)
-router.delete('/projects/:id', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const projectId = req.params.id;
-        const docRef = projectsCollection.doc(projectId);
-        const doc = await docRef.get();
-        if (!doc.exists) {
-            return res.status(404).json({ error: 'Project not found.' });
-        }
-
-        await docRef.update({
-            status: 'archived',
-            updatedAt: Date.now()
-        });
-        res.json({ status: 'success' });
-    } catch (error) {
-        console.error('Error archiving project:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
 
 // POST /api/accounting/journal-entries
 router.post('/journal-entries', verifyToken, async (req: AuthenticatedRequest, res: Response) => {

@@ -19,12 +19,14 @@ import uploadRouter from './routes/upload.js';
 import docsRouter from './routes/docs.js';
 import adminRouter from './routes/admin.js';
 import accountingRouter from './routes/accounting.js';
+import projectsRouter from './routes/projects.js';
 
 app.use('/api/docs', docsRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/accounting', accountingRouter);
+app.use('/api/projects', projectsRouter);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

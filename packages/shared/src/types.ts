@@ -60,6 +60,7 @@ export interface ScanSession {
     capturedImages: CapturedImage[];
     stairways: Stairway[];
     audioRecordingUrl?: string;
+    projectId?: string;
 }
 
 // API Request/Response Types
@@ -120,10 +121,19 @@ export interface Account {
 export interface Project {
     id: string;
     name: string;
+    address: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    projectType: 'flip' | 'remodel' | 'addition' | 'other';
     customerId?: string;
-    status?: 'active' | 'on_hold' | 'completed' | 'archived';
+    status?: 'estimate' | 'active' | 'on_hold' | 'completed' | 'archived';
     startDate?: number;
     endDate?: number;
+    scanSessionIds?: string[];
     createdAt: number;
     updatedAt: number;
 }

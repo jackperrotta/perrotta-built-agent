@@ -230,86 +230,124 @@ const docsHtml = `
         <pre>{ "status": "success" }</pre>
     </div>
     <div class="endpoint">
-        <h3><span class="method post">POST</span> /accounting/projects</h3>
-        <p>Create a project for job-level financial tracking.</p>
+        <h3><span class="method post">POST</span> /projects</h3>
+        <p>Create a project for project management and lifecycle tracking.</p>
         <h4>Request Fields</h4>
         <pre>{
-  "name": "string (required)",
-  "status": "active | on_hold | completed | archived",
+  "address": "string (required)",
+  "projectType": "flip | remodel | addition | other (required)",
+  "name": "string (optional, auto-derived if omitted)",
+  "addressLine1": "string (optional)",
+  "addressLine2": "string (optional)",
+  "city": "string (optional)",
+  "state": "string (optional)",
+  "postalCode": "string (optional)",
+  "country": "string (optional)",
+  "status": "estimate | active | on_hold | completed | archived",
   "customerId": "string | null",
   "startDate": "number (ms)",
   "endDate": "number (ms)"
 }</pre>
         <h4>Request Body</h4>
         <pre>{
-  "name": "Kitchen Remodel - 123 Main St",
-  "status": "active",
-  "startDate": 1710000000000
+  "address": "609 Gerritt St, Philadelphia",
+  "projectType": "flip",
+  "status": "estimate"
 }</pre>
         <h4>Response</h4>
         <pre>{
   "status": "success",
   "project": {
     "id": "uuid",
-    "name": "Kitchen Remodel - 123 Main St",
-    "status": "active",
+    "name": "609 Gerritt St Flip",
+    "address": "609 Gerritt St, Philadelphia",
+    "addressLine1": "609 Gerritt St",
+    "city": "Philadelphia",
+    "projectType": "flip",
+    "status": "estimate",
     "createdAt": 1710000000000,
     "updatedAt": 1710000000000
   }
 }</pre>
     </div>
     <div class="endpoint">
-        <h3><span class="method get">GET</span> /accounting/projects</h3>
+        <h3><span class="method get">GET</span> /projects</h3>
         <p>List projects.</p>
         <h4>Response Fields</h4>
         <pre>[
   {
     "id": "string",
     "name": "string",
-    "status": "active | on_hold | completed | archived",
+    "address": "string",
+    "addressLine1": "string",
+    "addressLine2": "string",
+    "city": "string",
+    "state": "string",
+    "postalCode": "string",
+    "country": "string",
+    "projectType": "flip | remodel | addition | other",
+    "status": "estimate | active | on_hold | completed | archived",
     "customerId": "string | null",
     "startDate": "number (ms)",
-    "endDate": "number (ms)"
+    "endDate": "number (ms)",
+    "scanSessionIds": ["string"]
   }
 ]</pre>
         <h4>Response</h4>
         <pre>[
-  { "id": "uuid", "name": "Kitchen Remodel - 123 Main St", "status": "active" }
+  { "id": "uuid", "name": "609 Gerritt St Flip", "projectType": "flip", "status": "estimate" }
 ]</pre>
     </div>
     <div class="endpoint">
-        <h3><span class="method get">GET</span> /accounting/projects/:id</h3>
+        <h3><span class="method get">GET</span> /projects/:id</h3>
         <p>Get a project by ID.</p>
         <h4>Response Fields</h4>
         <pre>{
   "id": "string",
   "name": "string",
-  "status": "active | on_hold | completed | archived",
+  "address": "string",
+  "addressLine1": "string",
+  "addressLine2": "string",
+  "city": "string",
+  "state": "string",
+  "postalCode": "string",
+  "country": "string",
+  "projectType": "flip | remodel | addition | other",
+  "status": "estimate | active | on_hold | completed | archived",
   "customerId": "string | null",
   "startDate": "number (ms)",
-  "endDate": "number (ms)"
+  "endDate": "number (ms)",
+  "scanSessionIds": ["string"]
 }</pre>
         <h4>Response</h4>
-        <pre>{ "id": "uuid", "name": "Kitchen Remodel - 123 Main St", "status": "active" }</pre>
+        <pre>{ "id": "uuid", "name": "609 Gerritt St Flip", "projectType": "flip", "status": "estimate" }</pre>
     </div>
     <div class="endpoint">
-        <h3><span class="method put">PUT</span> /accounting/projects/:id</h3>
+        <h3><span class="method put">PUT</span> /projects/:id</h3>
         <p>Update a project by ID.</p>
         <h4>Request Fields</h4>
         <pre>{
-  "name": "string",
-  "status": "active | on_hold | completed | archived",
+  "name": "string (optional, auto-derived if omitted when address/type changes)",
+  "address": "string",
+  "addressLine1": "string",
+  "addressLine2": "string",
+  "city": "string",
+  "state": "string",
+  "postalCode": "string",
+  "country": "string",
+  "projectType": "flip | remodel | addition | other",
+  "status": "estimate | active | on_hold | completed | archived",
   "customerId": "string | null",
   "startDate": "number (ms)",
   "endDate": "number (ms)"
 }</pre>
         <h4>Request Body</h4>
-        <pre>{ "status": "completed" }</pre>
+        <pre>{ "address": "609 Gerritt St, Philadelphia", "projectType": "flip" }</pre>
         <h4>Response</h4>
         <pre>{ "status": "success", "project": { "id": "uuid", "status": "completed" } }</pre>
     </div>
     <div class="endpoint">
-        <h3><span class="method delete">DELETE</span> /accounting/projects/:id</h3>
+        <h3><span class="method delete">DELETE</span> /projects/:id</h3>
         <p>Archive a project by ID.</p>
         <h4>Response</h4>
         <pre>{ "status": "success" }</pre>

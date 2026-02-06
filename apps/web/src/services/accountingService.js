@@ -37,17 +37,6 @@ export async function getAccounts() {
     return request('/accounts', { method: 'GET' });
 }
 
-export async function getProjects() {
-    return request('/projects', { method: 'GET' });
-}
-
-export async function createProject(payload) {
-    return request('/projects', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-    });
-}
-
 export async function createImport(payload) {
     return request('/imports', {
         method: 'POST',

@@ -5,6 +5,7 @@ import { type ScanSession, type CreateSessionResponse } from '@construction/shar
 
 const router = Router();
 const sessionsCollection = db.collection('sessions');
+const projectsCollection = db.collection('projects');
 
 // POST /api/sessions: Create or Update Session
 router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
@@ -34,6 +35,21 @@ router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =
                 ...sessionData,
                 updatedAt: Date.now()
             });
+        }
+
+        if (sessionData.projectId) {
+            const projectRef = projectsCollection.doc(sessionData.projectId);
+            const projectDoc = await projectRef.get();
+            if (projectDoc.exists) {
+                const projectData = projectDoc.data() as { scanSessionIds?: string[] };
+                const existingIds = projectData.scanSessionIds ?? [];
+                if (!existingIds.includes(sessionData.id)) {
+                    await projectRef.update({
+                        scanSessionIds: [...existingIds, sessionData.id],
+                        updatedAt: Date.now()
+                    });
+                }
+            }
         }
 
         const response: CreateSessionResponse = {

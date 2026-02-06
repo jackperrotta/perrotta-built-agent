@@ -152,12 +152,26 @@
         <h3>Create Project</h3>
         <div class="row">
             <div class="field">
-                <label for="project-name">Project Name</label>
-                <input id="project-name" placeholder="Kitchen Remodel - 123 Main St" />
+                <label for="project-address">Project Address</label>
+                <input id="project-address" placeholder="609 Gerritt St, Philadelphia" />
+            </div>
+            <div class="field">
+                <label for="project-type">Project Type</label>
+                <select id="project-type">
+                    <option value="flip">Flip</option>
+                    <option value="remodel">Remodel</option>
+                    <option value="addition">Addition</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="project-name">Project Name (auto)</label>
+                <input id="project-name" placeholder="609 Gerritt St Flip" />
             </div>
             <div class="field">
                 <label for="project-status">Status</label>
                 <select id="project-status">
+                    <option value="estimate">Estimate</option>
                     <option value="active">Active</option>
                     <option value="on_hold">On Hold</option>
                     <option value="completed">Completed</option>
@@ -297,8 +311,6 @@
         import {
             seedChartOfAccounts,
             getAccounts,
-            getProjects,
-            createProject,
             getJournalEntries,
             createJournalEntry,
             deleteJournalEntry,
@@ -312,12 +324,15 @@
             linkReceipt,
             getReceipts
         } from '../src/services/accountingService.js';
+        import { getProjects, createProject } from '../src/services/projectService.js';
 
         const userInfoDiv = document.getElementById('user-info');
         const backendStatusDiv = document.getElementById('backend-status');
         const logoutBtn = document.getElementById('logout-btn');
         const seedCoaBtn = document.getElementById('seed-coa-btn');
         const coaStatus = document.getElementById('coa-status');
+        const projectAddressInput = document.getElementById('project-address');
+        const projectTypeSelect = document.getElementById('project-type');
         const projectNameInput = document.getElementById('project-name');
         const projectStatusSelect = document.getElementById('project-status');
         const projectStartInput = document.getElementById('project-start');
@@ -443,21 +458,27 @@
             });
 
             createProjectBtn.addEventListener('click', async () => {
+                const address = projectAddressInput.value.trim();
+                const projectType = projectTypeSelect.value;
                 const name = projectNameInput.value.trim();
-                if (!name) {
-                    showStatus(projectStatusMessage, 'Project name is required.', true);
+                if (!address || !projectType) {
+                    showStatus(projectStatusMessage, 'Project address and type are required.', true);
                     return;
                 }
 
                 try {
                     const payload = {
-                        name,
+                        name: name || undefined,
+                        address,
+                        projectType,
                         status: projectStatusSelect.value,
                         startDate: projectStartInput.value ? new Date(projectStartInput.value).getTime() : undefined,
                         endDate: projectEndInput.value ? new Date(projectEndInput.value).getTime() : undefined
                     };
                     await createProject(payload);
                     showStatus(projectStatusMessage, 'Project created.');
+                    projectAddressInput.value = '';
+                    projectTypeSelect.value = 'flip';
                     projectNameInput.value = '';
                     projectStartInput.value = '';
                     projectEndInput.value = '';
@@ -466,6 +487,9 @@
                     showStatus(projectStatusMessage, `Project create failed: ${error.message}`, true);
                 }
             });
+
+            projectAddressInput.addEventListener('input', updateProjectNamePreview);
+            projectTypeSelect.addEventListener('change', updateProjectNamePreview);
 
             addLineBtn.addEventListener('click', () => addLineRow());
             submitEntryBtn.addEventListener('click', handleSubmitEntry);
@@ -509,6 +533,22 @@
             } catch (error) {
                 showStatus(projectStatusMessage, `Failed to load projects: ${error.message}`, true);
             }
+        }
+
+        function updateProjectNamePreview() {
+            const address = projectAddressInput.value.trim();
+            const typeLabel = {
+                flip: 'Flip',
+                remodel: 'Remodel',
+                addition: 'Addition',
+                other: 'Project'
+            }[projectTypeSelect.value] || 'Project';
+            const street = address.split(',')[0]?.trim() || address;
+            if (!street) {
+                projectNameInput.value = '';
+                return;
+            }
+            projectNameInput.value = `${street} ${typeLabel}`.trim();
         }
 
         function updateAccountSelects() {
