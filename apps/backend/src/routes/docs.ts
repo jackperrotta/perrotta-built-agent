@@ -646,6 +646,22 @@ const docsHtml = `
   "filename": "string (required if imagePath not provided)",
   "imagePath": "string (optional file:// path, used to infer filename)",
   "contentType": "string (required for uploadUrl)",
+  "rawOcrText": "string (optional)",
+  "rawLines": ["string"],
+  "parsedSource": "string (optional, e.g. ios_parser_v1)",
+  "parseConfidence": "number (0-1)",
+  "processingVersion": "string",
+  "paymentMethod": "string",
+  "returnPolicyDescription": "string",
+  "items": [
+    {
+      "description": "string",
+      "quantity": "number",
+      "unitPrice": "number",
+      "amount": "number",
+      "category": "string"
+    }
+  ],
   "extracted": {
     "merchant": "string",
     "merchantName": "string",
@@ -679,6 +695,22 @@ const docsHtml = `
         <h4>Request Fields</h4>
         <pre>{
   "rawText": "string",
+  "rawOcrText": "string",
+  "rawLines": ["string"],
+  "parsedSource": "string (optional)",
+  "parseConfidence": "number (0-1)",
+  "processingVersion": "string",
+  "paymentMethod": "string",
+  "returnPolicyDescription": "string",
+  "items": [
+    {
+      "description": "string",
+      "quantity": "number",
+      "unitPrice": "number",
+      "amount": "number",
+      "category": "string"
+    }
+  ],
   "extracted": {
     "merchant": "string",
     "merchantName": "string",
@@ -707,6 +739,23 @@ const docsHtml = `
 }</pre>
         <h4>Response</h4>
         <pre>{ "status": "success", "linkedTransactionId": "uuid" }</pre>
+    </div>
+    <div class="endpoint">
+        <h3><span class="method post">POST</span> /accounting/receipts/:id/enrich</h3>
+        <p>Manually trigger AI enrichment for a single receipt.</p>
+        <h4>Response</h4>
+        <pre>{ "status": "success" }</pre>
+    </div>
+    <div class="endpoint">
+        <h3><span class="method post">POST</span> /accounting/receipts/enrich</h3>
+        <p>Manually trigger AI enrichment for recent receipts.</p>
+        <h4>Request Fields</h4>
+        <pre>{
+  "status": "uploaded | processing | processed | error (optional)",
+  "limit": "number (max 100, default 25)"
+}</pre>
+        <h4>Response</h4>
+        <pre>{ "status": "success", "enrichedCount": 10 }</pre>
     </div>
     <div class="endpoint">
         <h3><span class="method post">POST</span> /accounting/receipts/:id/link-transaction</h3>

@@ -11,9 +11,11 @@ import {
     type BankTransaction,
     type CategorizationRule,
     type Receipt,
-    type ReceiptExtraction
+    type ReceiptExtraction,
+    type ReceiptLineItem
 } from '@construction/shared';
 import { generateSignedUploadUrl } from '../services/storage.js';
+import { enrichReceiptAsync } from '../services/receiptEnrichment.js';
 
 const router = Router();
 const accountsCollection = db.collection('accounts');
@@ -22,6 +24,7 @@ const importsCollection = db.collection('imports');
 const transactionsCollection = db.collection('transactions');
 const rulesCollection = db.collection('rules');
 const receiptsCollection = db.collection('receipts');
+const merchantsCollection = db.collection('merchants');
 
 const DEFAULT_CURRENCY = 'USD';
 const DEFAULT_BANK_ACCOUNT_ID = '1010';
@@ -285,6 +288,9 @@ const normalizeReceiptExtraction = (payload?: ReceiptExtraction | Record<string,
         : typeof anyPayload.totalAmount === 'number'
             ? anyPayload.totalAmount
             : undefined;
+    const subtotal = typeof anyPayload.subtotal === 'number'
+        ? anyPayload.subtotal
+        : undefined;
     const merchant = typeof anyPayload.merchant === 'string'
         ? anyPayload.merchant
         : typeof anyPayload.merchantName === 'string'
@@ -295,7 +301,10 @@ const normalizeReceiptExtraction = (payload?: ReceiptExtraction | Record<string,
 
     return {
         merchant,
+        merchantName: merchant,
         total,
+        totalAmount: total,
+        subtotal,
         tax: typeof anyPayload.tax === 'number' ? anyPayload.tax : undefined,
         date: normalizedDate,
         currency: typeof anyPayload.currency === 'string' ? anyPayload.currency : undefined,
@@ -308,6 +317,150 @@ const stripUndefined = <T extends Record<string, unknown>>(data: T): T => {
     return Object.fromEntries(
         Object.entries(data).filter(([, value]) => value !== undefined)
     ) as T;
+};
+
+const normalizeMerchantName = (value?: string) => {
+    if (!value) return undefined;
+    return value.trim().replace(/\s+/g, ' ');
+};
+
+const merchantSlug = (value?: string) => {
+    if (!value) return undefined;
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+};
+
+const upsertMerchant = async (merchantName?: string) => {
+    const normalized = normalizeMerchantName(merchantName);
+    if (!normalized) return undefined;
+    const slug = merchantSlug(normalized);
+    if (!slug) return undefined;
+    const docRef = merchantsCollection.doc(slug);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+        await docRef.set({
+            id: slug,
+            name: normalized,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        });
+    }
+    return slug;
+};
+
+const normalizeLineItems = (items?: unknown): ReceiptLineItem[] | undefined => {
+    if (!Array.isArray(items)) return undefined;
+    const normalized = items.map(item => {
+        const record = item as Record<string, unknown>;
+        return stripUndefined({
+            id: typeof record.id === 'string' ? record.id : undefined,
+            description: typeof record.description === 'string' ? record.description : undefined,
+            descriptionRaw: typeof record.descriptionRaw === 'string' ? record.descriptionRaw : undefined,
+            quantity: typeof record.quantity === 'number' ? record.quantity : undefined,
+            unitPrice: typeof record.unitPrice === 'number' ? record.unitPrice : undefined,
+            amount: typeof record.amount === 'number' ? record.amount : undefined,
+            category: typeof record.category === 'string' ? record.category : undefined,
+            sku: typeof record.sku === 'string' ? record.sku : undefined,
+            upc: typeof record.upc === 'string' ? record.upc : undefined,
+            taxable: typeof record.taxable === 'boolean' ? record.taxable : undefined
+        });
+    });
+    return normalized;
+};
+
+const parsePaymentMethod = (value?: string) => {
+    if (!value) return {};
+    const last4Match = value.match(/(\d{4})$/);
+    const last4 = last4Match ? last4Match[1] : undefined;
+    let tenderType: string | undefined;
+    if (/visa/i.test(value)) tenderType = 'card';
+    if (/mastercard/i.test(value)) tenderType = 'card';
+    if (/amex/i.test(value)) tenderType = 'card';
+    if (/cash/i.test(value)) tenderType = 'cash';
+    return { paymentMethod: value, cardLast4: last4, tenderType };
+};
+
+const normalizeReceiptDetails = (payload: Record<string, unknown>) => {
+    const merchantName = normalizeMerchantName(
+        typeof payload.merchantName === 'string'
+            ? payload.merchantName
+            : typeof payload.merchant === 'string'
+                ? payload.merchant
+                : undefined
+    );
+    const total = typeof payload.total === 'number'
+        ? payload.total
+        : typeof payload.totalAmount === 'number'
+            ? payload.totalAmount
+            : undefined;
+    const subtotal = typeof payload.subtotal === 'number' ? payload.subtotal : undefined;
+    const tax = typeof payload.tax === 'number' ? payload.tax : undefined;
+    const currency = typeof payload.currency === 'string' ? payload.currency : undefined;
+    const rawDate = typeof payload.date === 'number' ? payload.date : undefined;
+    const transactionDate = rawDate && rawDate < 1_000_000_000_000 ? rawDate * 1000 : rawDate;
+
+    const paymentMethod = typeof payload.paymentMethod === 'string' ? payload.paymentMethod : undefined;
+    const authCode = typeof payload.authCode === 'string' ? payload.authCode : undefined;
+    const returnPolicyText = typeof payload.returnPolicyDescription === 'string'
+        ? payload.returnPolicyDescription
+        : typeof payload.returnPolicyText === 'string'
+            ? payload.returnPolicyText
+            : undefined;
+
+    const rawLines = Array.isArray(payload.rawLines)
+        ? (payload.rawLines.filter(line => typeof line === 'string') as string[])
+        : undefined;
+    const rawOcrText = typeof payload.rawOcrText === 'string'
+        ? payload.rawOcrText
+        : typeof payload.rawText === 'string'
+            ? payload.rawText
+            : undefined;
+
+    const parsedSource = typeof payload.parsedSource === 'string' ? payload.parsedSource : undefined;
+    const parseConfidence = typeof payload.parseConfidence === 'number' ? payload.parseConfidence : undefined;
+    const processingVersion = typeof payload.processingVersion === 'string' ? payload.processingVersion : undefined;
+
+    const { paymentMethod: normalizedPayment, cardLast4, tenderType } = parsePaymentMethod(paymentMethod);
+    const lineItems = normalizeLineItems(payload.items);
+
+    return stripUndefined({
+        merchantName,
+        total,
+        subtotal,
+        tax,
+        currency,
+        transactionDate,
+        paymentMethod: normalizedPayment,
+        cardLast4,
+        authCode,
+        tenderType,
+        returnPolicyText,
+        rawOcrText,
+        rawLines,
+        parsedSource,
+        parseConfidence,
+        processingVersion,
+        lineItems
+    });
+};
+
+const validateReceiptTotals = (details: Record<string, unknown>) => {
+    const warnings: string[] = [];
+    const subtotal = typeof details.subtotal === 'number' ? details.subtotal : undefined;
+    const tax = typeof details.tax === 'number' ? details.tax : undefined;
+    const total = typeof details.total === 'number' ? details.total : undefined;
+    const tip = typeof details.tip === 'number' ? details.tip : 0;
+    const discounts = typeof details.discounts === 'number' ? details.discounts : 0;
+
+    if (subtotal !== undefined && tax !== undefined && total !== undefined) {
+        const computed = subtotal + tax + tip - discounts;
+        if (Math.abs(computed - total) > 0.02) {
+            warnings.push('Totals do not reconcile with subtotal/tax/discounts.');
+        }
+    }
+    return warnings;
 };
 
 const findMatchingTransaction = async (amount?: number, date?: number) => {
@@ -858,6 +1011,17 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
         const receiptId = body.id || crypto.randomUUID();
         const storagePath = body.storagePath || `accounting/receipts/${receiptId}/${filename}`;
         const extracted = normalizeReceiptExtraction(body.extracted as ReceiptExtraction);
+        const details = normalizeReceiptDetails(body as Record<string, unknown>);
+        const mergedDetails = {
+            ...details,
+            merchantName: details.merchantName ?? extracted?.merchantName ?? extracted?.merchant,
+            subtotal: details.subtotal ?? extracted?.subtotal,
+            tax: details.tax ?? extracted?.tax,
+            total: details.total ?? extracted?.total ?? extracted?.totalAmount,
+            currency: details.currency ?? extracted?.currency
+        };
+        const merchantId = await upsertMerchant(mergedDetails.merchantName);
+        const validationWarnings = validateReceiptTotals(mergedDetails);
         const record: Receipt = {
             id: receiptId,
             filename,
@@ -865,6 +1029,25 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
             contentType: body.contentType,
             status: 'uploaded',
             extracted,
+            rawOcrText: details.rawOcrText,
+            rawLines: details.rawLines,
+            parsedSource: details.parsedSource,
+            parseConfidence: details.parseConfidence,
+            processingVersion: details.processingVersion ?? 'v1',
+            merchantName: mergedDetails.merchantName,
+            merchantId,
+            transactionDate: details.transactionDate,
+            subtotal: mergedDetails.subtotal,
+            tax: mergedDetails.tax,
+            total: mergedDetails.total,
+            currency: mergedDetails.currency,
+            paymentMethod: details.paymentMethod,
+            cardLast4: details.cardLast4,
+            authCode: details.authCode,
+            tenderType: details.tenderType,
+            returnPolicyText: details.returnPolicyText,
+            lineItems: details.lineItems,
+            validationWarnings: validationWarnings.length ? validationWarnings : undefined,
             linkedTransactionId: body.linkedTransactionId,
             createdBy: req.user?.uid || 'unknown',
             createdAt: now,
@@ -872,6 +1055,16 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
         };
 
         await receiptsCollection.doc(receiptId).set(stripUndefined(record as Record<string, unknown>));
+
+        void enrichReceiptAsync(receiptId, {
+            rawOcrText: details.rawOcrText,
+            rawLines: details.rawLines,
+            extracted: body.extracted as Record<string, unknown>,
+            items: (body as Record<string, unknown>).items,
+            returnPolicyText: details.returnPolicyText,
+            paymentMethod: details.paymentMethod,
+            source: 'auto'
+        });
 
         let uploadUrl: string | undefined;
         if (body.contentType) {
@@ -940,6 +1133,21 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
                 rawText: normalizedExtracted.rawText || body.rawText
             }
             : extractReceiptData(body.rawText);
+
+        const details = normalizeReceiptDetails({
+            ...((body.extracted || {}) as Record<string, unknown>),
+            rawText: body.rawText
+        });
+        const mergedDetails = {
+            ...details,
+            merchantName: details.merchantName ?? extracted.merchantName ?? extracted.merchant,
+            subtotal: details.subtotal ?? extracted.subtotal,
+            tax: details.tax ?? extracted.tax,
+            total: details.total ?? extracted.total ?? extracted.totalAmount,
+            currency: details.currency ?? extracted.currency
+        };
+        const merchantId = await upsertMerchant(mergedDetails.merchantName);
+        const validationWarnings = validateReceiptTotals(mergedDetails);
         let linkedTransactionId: string | undefined;
         const match = await findMatchingTransaction(extracted.total, extracted.date);
         if (match) {
@@ -953,10 +1161,39 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
         await docRef.update(stripUndefined({
             status: 'processed',
             extracted,
+            rawOcrText: details.rawOcrText,
+            rawLines: details.rawLines,
+            parsedSource: details.parsedSource,
+            parseConfidence: details.parseConfidence,
+            processingVersion: details.processingVersion ?? 'v1',
+            merchantName: mergedDetails.merchantName,
+            merchantId,
+            transactionDate: details.transactionDate,
+            subtotal: mergedDetails.subtotal,
+            tax: mergedDetails.tax,
+            total: mergedDetails.total,
+            currency: mergedDetails.currency,
+            paymentMethod: details.paymentMethod,
+            cardLast4: details.cardLast4,
+            authCode: details.authCode,
+            tenderType: details.tenderType,
+            returnPolicyText: details.returnPolicyText,
+            lineItems: details.lineItems,
+            validationWarnings: validationWarnings.length ? validationWarnings : undefined,
             linkedTransactionId,
             processedAt: Date.now(),
             updatedAt: Date.now()
         }));
+
+        void enrichReceiptAsync(receiptId, {
+            rawOcrText: details.rawOcrText,
+            rawLines: details.rawLines,
+            extracted: body.extracted as Record<string, unknown>,
+            items: (body.extracted as Record<string, unknown>)?.items,
+            returnPolicyText: details.returnPolicyText,
+            paymentMethod: details.paymentMethod,
+            source: 'auto'
+        });
 
         res.json({ status: 'success', linkedTransactionId });
     } catch (error) {
@@ -1004,6 +1241,65 @@ router.post('/receipts/:id/link-transaction', verifyToken, async (req: Authentic
     } catch (error) {
         console.error('Error linking receipt:', error);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST /api/accounting/receipts/:id/enrich
+router.post('/receipts/:id/enrich', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const receiptId = req.params.id;
+        const doc = await receiptsCollection.doc(receiptId).get();
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Receipt not found.' });
+        }
+
+        const receipt = doc.data() as Receipt;
+        await enrichReceiptAsync(receiptId, {
+            rawOcrText: receipt.rawOcrText,
+            rawLines: receipt.rawLines,
+            extracted: receipt.extracted as Record<string, unknown>,
+            items: receipt.lineItems,
+            returnPolicyText: receipt.returnPolicyText,
+            paymentMethod: receipt.paymentMethod,
+            source: 'manual'
+        });
+
+        res.json({ status: 'success' });
+    } catch (error) {
+        console.error('Error enriching receipt:', error);
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
+    }
+});
+
+// POST /api/accounting/receipts/enrich
+router.post('/receipts/enrich', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const body = req.body as { status?: Receipt['status']; limit?: number };
+        const limit = typeof body.limit === 'number' && body.limit > 0 ? Math.min(body.limit, 100) : 25;
+
+        const snapshot = await receiptsCollection.orderBy('createdAt', 'desc').get();
+        let receipts = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Receipt);
+        if (body.status) {
+            receipts = receipts.filter(receipt => receipt.status === body.status);
+        }
+
+        const targetReceipts = receipts.slice(0, limit);
+        for (const receipt of targetReceipts) {
+            await enrichReceiptAsync(receipt.id, {
+                rawOcrText: receipt.rawOcrText,
+                rawLines: receipt.rawLines,
+                extracted: receipt.extracted as Record<string, unknown>,
+                items: receipt.lineItems,
+                returnPolicyText: receipt.returnPolicyText,
+                paymentMethod: receipt.paymentMethod,
+                source: 'manual'
+            });
+        }
+
+        res.json({ status: 'success', enrichedCount: targetReceipts.length });
+    } catch (error) {
+        console.error('Error enriching receipts:', error);
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
     }
 });
 

@@ -1,8 +1,10 @@
 import * as admin from 'firebase-admin';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 import { MockFirestore, MockStorage, MockAuth } from './mockFirebase.js';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 const isMock = process.env.MOCK_FIREBASE === 'true';
 

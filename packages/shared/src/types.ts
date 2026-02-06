@@ -253,12 +253,28 @@ export type ReceiptStatus = 'uploaded' | 'processing' | 'processed' | 'error';
 
 export interface ReceiptExtraction {
     merchant?: string;
+    merchantName?: string;
     total?: number;
+    totalAmount?: number;
+    subtotal?: number;
     tax?: number;
     date?: number;
     currency?: string;
     confidence?: number;
     rawText?: string;
+}
+
+export interface ReceiptLineItem {
+    id?: string;
+    description?: string;
+    descriptionRaw?: string;
+    quantity?: number;
+    unitPrice?: number;
+    amount?: number;
+    category?: string;
+    sku?: string;
+    upc?: string;
+    taxable?: boolean;
 }
 
 export interface Receipt {
@@ -268,6 +284,39 @@ export interface Receipt {
     contentType?: string;
     status: ReceiptStatus;
     extracted?: ReceiptExtraction;
+    rawOcrText?: string;
+    rawLines?: string[];
+    parsedSource?: string;
+    parseConfidence?: number;
+    processingVersion?: string;
+    merchantName?: string;
+    merchantId?: string;
+    storeId?: string;
+    merchantPhone?: string;
+    merchantAddressLine1?: string;
+    merchantCity?: string;
+    merchantState?: string;
+    merchantPostalCode?: string;
+    geoLat?: number;
+    geoLng?: number;
+    transactionDate?: number;
+    transactionTime?: string;
+    timezone?: string;
+    subtotal?: number;
+    tax?: number;
+    total?: number;
+    currency?: string;
+    discounts?: number;
+    tip?: number;
+    paymentMethod?: string;
+    cardLast4?: string;
+    authCode?: string;
+    tenderType?: string;
+    returnPolicyText?: string;
+    returnPolicyDays?: number;
+    returnPolicyExpiresAt?: number;
+    lineItems?: ReceiptLineItem[];
+    validationWarnings?: string[];
     linkedTransactionId?: string;
     createdBy: string;
     createdAt: number;
