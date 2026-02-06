@@ -40,6 +40,83 @@
             margin-bottom: 1rem;
         }
 
+        .row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            min-width: 180px;
+            flex: 1;
+        }
+
+        .field label {
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        input, select, textarea {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        button.primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        button.danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f7f7f7;
+            text-align: left;
+        }
+
+        .status {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 6px;
+            background: #f7f9ff;
+            color: #1d3b8b;
+        }
+
+        .status.error {
+            background: #fff5f5;
+            color: #b91c1c;
+        }
+
         pre {
             background: #eee;
             padding: 1rem;
@@ -65,13 +142,214 @@
         <div id="backend-status">Checking...</div>
     </div>
 
+    <div class="card">
+        <h2>Accounting Setup</h2>
+        <div class="row">
+            <button class="secondary" id="seed-coa-btn">Seed Chart of Accounts</button>
+            <div id="coa-status" class="status" style="display:none;"></div>
+        </div>
+
+        <h3>Create Project</h3>
+        <div class="row">
+            <div class="field">
+                <label for="project-name">Project Name</label>
+                <input id="project-name" placeholder="Kitchen Remodel - 123 Main St" />
+            </div>
+            <div class="field">
+                <label for="project-status">Status</label>
+                <select id="project-status">
+                    <option value="active">Active</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="project-start">Start Date</label>
+                <input id="project-start" type="date" />
+            </div>
+            <div class="field">
+                <label for="project-end">End Date</label>
+                <input id="project-end" type="date" />
+            </div>
+        </div>
+        <button class="primary" id="create-project-btn">Create Project</button>
+        <div id="project-status-message" class="status" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+        <h2>Journal Entry Builder</h2>
+        <div class="row">
+            <div class="field">
+                <label for="entry-date">Entry Date</label>
+                <input id="entry-date" type="date" />
+            </div>
+            <div class="field">
+                <label for="entry-memo">Memo</label>
+                <input id="entry-memo" placeholder="Description" />
+            </div>
+            <div class="field">
+                <label for="entry-project">Project</label>
+                <select id="entry-project">
+                    <option value="">(No project)</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="entry-currency">Currency</label>
+                <input id="entry-currency" value="USD" />
+            </div>
+        </div>
+
+        <table id="journal-lines-table">
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th>Debit</th>
+                    <th>Credit</th>
+                    <th>Memo</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <div class="row">
+            <button class="secondary" id="add-line-btn">Add Line</button>
+            <button class="primary" id="submit-entry-btn">Post Entry</button>
+        </div>
+        <div id="entry-status" class="status" style="display:none;"></div>
+
+        <h3>Recent Journal Entries</h3>
+        <div id="recent-entries">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>Statement Import & Review</h2>
+        <div class="row">
+            <div class="field">
+                <label for="import-file">Bank Statement (CSV)</label>
+                <input id="import-file" type="file" accept=".csv,text/csv" />
+            </div>
+            <div class="field">
+                <label for="import-currency">Currency</label>
+                <input id="import-currency" value="USD" />
+            </div>
+        </div>
+        <button class="primary" id="import-process-btn">Upload & Process</button>
+        <div id="import-status" class="status" style="display:none;"></div>
+
+        <h3>Auto-Categorization Rules</h3>
+        <div class="row">
+            <div class="field">
+                <label for="rule-name">Rule Name</label>
+                <input id="rule-name" placeholder="Home Depot materials" />
+            </div>
+            <div class="field">
+                <label for="rule-match">Match Text</label>
+                <input id="rule-match" placeholder="HOME DEPOT" />
+            </div>
+            <div class="field">
+                <label for="rule-account">Account</label>
+                <select id="rule-account">
+                    <option value="">Select account</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="rule-project">Project</label>
+                <select id="rule-project">
+                    <option value="">(No project)</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="rule-priority">Priority</label>
+                <input id="rule-priority" type="number" value="0" />
+            </div>
+        </div>
+        <button class="secondary" id="create-rule-btn">Create Rule</button>
+        <div id="rule-status" class="status" style="display:none;"></div>
+
+        <h3>Uncategorized Transactions</h3>
+        <div id="transactions-table">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>Receipt Upload & Matching</h2>
+        <div class="row">
+            <div class="field">
+                <label for="receipt-file">Receipt Image/PDF</label>
+                <input id="receipt-file" type="file" accept="image/*,application/pdf" />
+            </div>
+            <div class="field">
+                <label for="receipt-raw-text">OCR Text (optional)</label>
+                <textarea id="receipt-raw-text" rows="3" placeholder="Paste OCR text here"></textarea>
+            </div>
+        </div>
+        <button class="primary" id="receipt-process-btn">Create & Process Receipt</button>
+        <div id="receipt-status" class="status" style="display:none;"></div>
+
+        <h3>Receipts</h3>
+        <div id="receipts-table">Loading...</div>
+    </div>
+
     <script type="module">
         import { logout, onAuthChange, getToken } from '../src/auth.js';
         import { getSessions } from '../src/services/sessionService.js';
+        import {
+            seedChartOfAccounts,
+            getAccounts,
+            getProjects,
+            createProject,
+            getJournalEntries,
+            createJournalEntry,
+            deleteJournalEntry,
+            createImport,
+            processImport,
+            getTransactions,
+            categorizeTransaction,
+            createRule,
+            createReceipt,
+            processReceipt,
+            linkReceipt,
+            getReceipts
+        } from '../src/services/accountingService.js';
 
         const userInfoDiv = document.getElementById('user-info');
         const backendStatusDiv = document.getElementById('backend-status');
         const logoutBtn = document.getElementById('logout-btn');
+        const seedCoaBtn = document.getElementById('seed-coa-btn');
+        const coaStatus = document.getElementById('coa-status');
+        const projectNameInput = document.getElementById('project-name');
+        const projectStatusSelect = document.getElementById('project-status');
+        const projectStartInput = document.getElementById('project-start');
+        const projectEndInput = document.getElementById('project-end');
+        const createProjectBtn = document.getElementById('create-project-btn');
+        const projectStatusMessage = document.getElementById('project-status-message');
+        const entryDateInput = document.getElementById('entry-date');
+        const entryMemoInput = document.getElementById('entry-memo');
+        const entryProjectSelect = document.getElementById('entry-project');
+        const entryCurrencyInput = document.getElementById('entry-currency');
+        const journalLinesTableBody = document.querySelector('#journal-lines-table tbody');
+        const addLineBtn = document.getElementById('add-line-btn');
+        const submitEntryBtn = document.getElementById('submit-entry-btn');
+        const entryStatus = document.getElementById('entry-status');
+        const recentEntriesDiv = document.getElementById('recent-entries');
+        const importFileInput = document.getElementById('import-file');
+        const importCurrencyInput = document.getElementById('import-currency');
+        const importProcessBtn = document.getElementById('import-process-btn');
+        const importStatus = document.getElementById('import-status');
+        const ruleNameInput = document.getElementById('rule-name');
+        const ruleMatchInput = document.getElementById('rule-match');
+        const ruleAccountSelect = document.getElementById('rule-account');
+        const ruleProjectSelect = document.getElementById('rule-project');
+        const rulePriorityInput = document.getElementById('rule-priority');
+        const createRuleBtn = document.getElementById('create-rule-btn');
+        const ruleStatus = document.getElementById('rule-status');
+        const transactionsTable = document.getElementById('transactions-table');
+        const receiptFileInput = document.getElementById('receipt-file');
+        const receiptRawTextInput = document.getElementById('receipt-raw-text');
+        const receiptProcessBtn = document.getElementById('receipt-process-btn');
+        const receiptStatus = document.getElementById('receipt-status');
+        const receiptsTable = document.getElementById('receipts-table');
 
         logoutBtn.addEventListener('click', logout);
 
@@ -87,6 +365,7 @@
             `;
 
             loadSessions();
+            await initializeAccounting();
         });
 
         async function loadSessions() {
@@ -129,6 +408,508 @@
 
             } catch (error) {
                 backendStatusDiv.innerHTML = `<p style="color: red">Error loading sessions: ${error.message}</p>`;
+            }
+        }
+
+        function showStatus(element, message, isError = false) {
+            element.textContent = message;
+            element.classList.toggle('error', isError);
+            element.style.display = 'block';
+        }
+
+        function clearStatus(element) {
+            element.textContent = '';
+            element.style.display = 'none';
+            element.classList.remove('error');
+        }
+
+        async function initializeAccounting() {
+            entryDateInput.valueAsDate = new Date();
+            clearStatus(coaStatus);
+            clearStatus(projectStatusMessage);
+            clearStatus(entryStatus);
+            clearStatus(importStatus);
+            clearStatus(ruleStatus);
+            clearStatus(receiptStatus);
+
+            seedCoaBtn.addEventListener('click', async () => {
+                try {
+                    const result = await seedChartOfAccounts();
+                    showStatus(coaStatus, result.message || `Seeded ${result.count} accounts.`);
+                    await loadAccounts();
+                } catch (error) {
+                    showStatus(coaStatus, `Seed failed: ${error.message}`, true);
+                }
+            });
+
+            createProjectBtn.addEventListener('click', async () => {
+                const name = projectNameInput.value.trim();
+                if (!name) {
+                    showStatus(projectStatusMessage, 'Project name is required.', true);
+                    return;
+                }
+
+                try {
+                    const payload = {
+                        name,
+                        status: projectStatusSelect.value,
+                        startDate: projectStartInput.value ? new Date(projectStartInput.value).getTime() : undefined,
+                        endDate: projectEndInput.value ? new Date(projectEndInput.value).getTime() : undefined
+                    };
+                    await createProject(payload);
+                    showStatus(projectStatusMessage, 'Project created.');
+                    projectNameInput.value = '';
+                    projectStartInput.value = '';
+                    projectEndInput.value = '';
+                    await loadProjects();
+                } catch (error) {
+                    showStatus(projectStatusMessage, `Project create failed: ${error.message}`, true);
+                }
+            });
+
+            addLineBtn.addEventListener('click', () => addLineRow());
+            submitEntryBtn.addEventListener('click', handleSubmitEntry);
+            importProcessBtn.addEventListener('click', handleImportProcess);
+            createRuleBtn.addEventListener('click', handleCreateRule);
+            receiptProcessBtn.addEventListener('click', handleReceiptProcess);
+
+            await Promise.all([loadAccounts(), loadProjects(), loadRecentEntries()]);
+            if (journalLinesTableBody.children.length === 0) {
+                addLineRow();
+                addLineRow();
+            }
+
+            await loadTransactions();
+            await loadReceipts();
+        }
+
+        let cachedAccounts = [];
+
+        async function loadAccounts() {
+            try {
+                cachedAccounts = await getAccounts();
+                updateAccountSelects();
+            } catch (error) {
+                showStatus(coaStatus, `Failed to load accounts: ${error.message}`, true);
+            }
+        }
+
+        async function loadProjects() {
+            try {
+                const projects = await getProjects();
+                entryProjectSelect.innerHTML = '<option value="">(No project)</option>';
+                ruleProjectSelect.innerHTML = '<option value="">(No project)</option>';
+                projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    entryProjectSelect.appendChild(option);
+                    ruleProjectSelect.appendChild(option.cloneNode(true));
+                });
+            } catch (error) {
+                showStatus(projectStatusMessage, `Failed to load projects: ${error.message}`, true);
+            }
+        }
+
+        function updateAccountSelects() {
+            const selects = journalLinesTableBody.querySelectorAll('select[data-account]');
+            selects.forEach(select => {
+                const current = select.value;
+                select.innerHTML = '<option value="">Select account</option>';
+                cachedAccounts
+                    .filter(account => account.isActive)
+                    .forEach(account => {
+                        const option = document.createElement('option');
+                        option.value = account.id;
+                        option.textContent = `${account.code} - ${account.name}`;
+                        select.appendChild(option);
+                    });
+                select.value = current;
+            });
+
+            ruleAccountSelect.innerHTML = '<option value="">Select account</option>';
+            cachedAccounts
+                .filter(account => account.isActive)
+                .forEach(account => {
+                    const option = document.createElement('option');
+                    option.value = account.id;
+                    option.textContent = `${account.code} - ${account.name}`;
+                    ruleAccountSelect.appendChild(option);
+                });
+        }
+
+        function addLineRow() {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <select data-account>
+                        <option value="">Select account</option>
+                    </select>
+                </td>
+                <td><input type="number" min="0" step="0.01" data-debit /></td>
+                <td><input type="number" min="0" step="0.01" data-credit /></td>
+                <td><input type="text" data-memo placeholder="Optional" /></td>
+                <td><button class="danger" data-remove>Remove</button></td>
+            `;
+            row.querySelector('[data-remove]').addEventListener('click', () => {
+                row.remove();
+            });
+            journalLinesTableBody.appendChild(row);
+            updateAccountSelects();
+        }
+
+        function collectLines() {
+            const rows = Array.from(journalLinesTableBody.querySelectorAll('tr'));
+            return rows.map(row => {
+                const accountId = row.querySelector('[data-account]').value;
+                const debitValue = row.querySelector('[data-debit]').value;
+                const creditValue = row.querySelector('[data-credit]').value;
+                const memo = row.querySelector('[data-memo]').value.trim();
+                const debit = debitValue ? Number(debitValue) : 0;
+                const credit = creditValue ? Number(creditValue) : 0;
+                return {
+                    accountId,
+                    debit,
+                    credit,
+                    memo
+                };
+            });
+        }
+
+        function validateLines(lines) {
+            if (lines.length < 2) {
+                return 'Add at least two lines.';
+            }
+            let debitTotal = 0;
+            let creditTotal = 0;
+            for (const line of lines) {
+                if (!line.accountId) {
+                    return 'Each line needs an account.';
+                }
+                if (line.debit < 0 || line.credit < 0) {
+                    return 'Debit and credit must be non-negative.';
+                }
+                if (line.debit > 0 && line.credit > 0) {
+                    return 'Each line must have a debit or credit, not both.';
+                }
+                if (line.debit === 0 && line.credit === 0) {
+                    return 'Each line must have a debit or credit.';
+                }
+                debitTotal += line.debit;
+                creditTotal += line.credit;
+            }
+            if (Math.round(debitTotal * 100) !== Math.round(creditTotal * 100)) {
+                return 'Debits and credits must balance.';
+            }
+            return null;
+        }
+
+        async function handleSubmitEntry() {
+            clearStatus(entryStatus);
+            const lines = collectLines();
+            const validationError = validateLines(lines);
+            if (validationError) {
+                showStatus(entryStatus, validationError, true);
+                return;
+            }
+
+            const dateValue = entryDateInput.value ? new Date(entryDateInput.value).getTime() : Date.now();
+            const payload = {
+                date: dateValue,
+                memo: entryMemoInput.value.trim() || undefined,
+                currency: entryCurrencyInput.value.trim() || 'USD',
+                lines: lines.map(line => ({
+                    ...line,
+                    projectId: entryProjectSelect.value || undefined
+                }))
+            };
+
+            try {
+                await createJournalEntry(payload);
+                showStatus(entryStatus, 'Journal entry posted.');
+                entryMemoInput.value = '';
+                await loadRecentEntries();
+            } catch (error) {
+                showStatus(entryStatus, `Failed to post: ${error.message}`, true);
+            }
+        }
+
+        async function loadRecentEntries() {
+            try {
+                const now = Date.now();
+                const thirtyDaysAgo = now - 1000 * 60 * 60 * 24 * 30;
+                const entries = await getJournalEntries({
+                    dateFrom: thirtyDaysAgo,
+                    dateTo: now
+                });
+
+                if (!entries.length) {
+                    recentEntriesDiv.innerHTML = '<p>No recent entries.</p>';
+                    return;
+                }
+
+                const html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Memo</th>
+                                <th>Lines</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${entries.map(entry => `
+                                <tr>
+                                    <td>${new Date(entry.date).toLocaleDateString()}</td>
+                                    <td>${entry.memo || ''}</td>
+                                    <td>${entry.lines.length}</td>
+                                    <td><button class="danger" data-delete="${entry.id}">Delete</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                recentEntriesDiv.innerHTML = html;
+
+                recentEntriesDiv.querySelectorAll('button[data-delete]').forEach(button => {
+                    button.addEventListener('click', async () => {
+                        const entryId = button.getAttribute('data-delete');
+                        if (!entryId) return;
+                        try {
+                            await deleteJournalEntry(entryId);
+                            await loadRecentEntries();
+                        } catch (error) {
+                            showStatus(entryStatus, `Delete failed: ${error.message}`, true);
+                        }
+                    });
+                });
+            } catch (error) {
+                recentEntriesDiv.innerHTML = `<p style="color: red">Failed to load entries: ${error.message}</p>`;
+            }
+        }
+
+        async function handleImportProcess() {
+            clearStatus(importStatus);
+            const file = importFileInput.files[0];
+            if (!file) {
+                showStatus(importStatus, 'Please select a CSV file.', true);
+                return;
+            }
+
+            try {
+                const csvText = await file.text();
+                const importRecord = await createImport({
+                    filename: file.name,
+                    contentType: file.type || 'text/csv',
+                    currency: importCurrencyInput.value.trim() || 'USD'
+                });
+                await processImport(importRecord.import.id, { csvText });
+                showStatus(importStatus, 'Import processed. Transactions loaded.');
+                await loadTransactions();
+            } catch (error) {
+                showStatus(importStatus, `Import failed: ${error.message}`, true);
+            }
+        }
+
+        async function handleCreateRule() {
+            clearStatus(ruleStatus);
+            const name = ruleNameInput.value.trim();
+            const matchText = ruleMatchInput.value.trim();
+            const accountId = ruleAccountSelect.value;
+            if (!name || !matchText || !accountId) {
+                showStatus(ruleStatus, 'Rule name, match text, and account are required.', true);
+                return;
+            }
+
+            try {
+                await createRule({
+                    name,
+                    matchText,
+                    accountId,
+                    projectId: ruleProjectSelect.value || undefined,
+                    priority: Number(rulePriorityInput.value) || 0,
+                    autoPost: false
+                });
+                showStatus(ruleStatus, 'Rule created.');
+                ruleNameInput.value = '';
+                ruleMatchInput.value = '';
+                rulePriorityInput.value = '0';
+                await loadTransactions();
+            } catch (error) {
+                showStatus(ruleStatus, `Rule create failed: ${error.message}`, true);
+            }
+        }
+
+        async function loadTransactions() {
+            try {
+                const transactions = await getTransactions({ status: 'uncategorized' });
+                cachedTransactions = await getTransactions();
+                if (!transactions.length) {
+                    transactionsTable.innerHTML = '<p>No uncategorized transactions.</p>';
+                    return;
+                }
+
+                const rows = transactions.map(transaction => `
+                    <tr data-id="${transaction.id}">
+                        <td>${new Date(transaction.date).toLocaleDateString()}</td>
+                        <td>${transaction.description}</td>
+                        <td>${transaction.amount.toFixed(2)}</td>
+                        <td>
+                            <select data-account>
+                                <option value="">Select account</option>
+                                ${cachedAccounts
+                                    .filter(account => account.isActive)
+                                    .map(account => `<option value="${account.id}">${account.code} - ${account.name}</option>`)
+                                    .join('')}
+                            </select>
+                        </td>
+                        <td>
+                            <select data-project>
+                                <option value="">(No project)</option>
+                                ${Array.from(entryProjectSelect.options)
+                                    .slice(1)
+                                    .map(option => `<option value="${option.value}">${option.textContent}</option>`)
+                                    .join('')}
+                            </select>
+                        </td>
+                        <td><button class="primary" data-categorize>Apply</button></td>
+                    </tr>
+                `).join('');
+
+                transactionsTable.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Account</th>
+                                <th>Project</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+
+                transactionsTable.querySelectorAll('button[data-categorize]').forEach(button => {
+                    button.addEventListener('click', async () => {
+                        const row = button.closest('tr');
+                        const accountId = row.querySelector('[data-account]').value;
+                        const projectId = row.querySelector('[data-project]').value || undefined;
+                        if (!accountId) {
+                            showStatus(importStatus, 'Select an account to categorize.', true);
+                            return;
+                        }
+                        try {
+                            await categorizeTransaction(row.dataset.id, { accountId, projectId });
+                            await loadTransactions();
+                        } catch (error) {
+                            showStatus(importStatus, `Categorize failed: ${error.message}`, true);
+                        }
+                    });
+                });
+            } catch (error) {
+                transactionsTable.innerHTML = `<p style="color: red">Failed to load transactions: ${error.message}</p>`;
+            }
+        }
+
+        let cachedTransactions = [];
+
+        async function handleReceiptProcess() {
+            clearStatus(receiptStatus);
+            const file = receiptFileInput.files[0];
+            if (!file) {
+                showStatus(receiptStatus, 'Please select a receipt file.', true);
+                return;
+            }
+
+            const rawText = receiptRawTextInput.value.trim();
+            if (!rawText) {
+                showStatus(receiptStatus, 'Paste OCR text to process this receipt.', true);
+                return;
+            }
+
+            try {
+                const receiptRecord = await createReceipt({
+                    filename: file.name,
+                    contentType: file.type || 'application/octet-stream'
+                });
+
+                await processReceipt(receiptRecord.receipt.id, { rawText });
+                showStatus(receiptStatus, 'Receipt processed.');
+                receiptRawTextInput.value = '';
+                receiptFileInput.value = '';
+                await loadReceipts();
+            } catch (error) {
+                showStatus(receiptStatus, `Receipt processing failed: ${error.message}`, true);
+            }
+        }
+
+        async function loadReceipts() {
+            try {
+                const receipts = await getReceipts();
+                if (!receipts.length) {
+                    receiptsTable.innerHTML = '<p>No receipts yet.</p>';
+                    return;
+                }
+
+                const options = cachedTransactions.map(txn => {
+                    const label = `${new Date(txn.date).toLocaleDateString()} - ${txn.description} (${txn.amount.toFixed(2)})`;
+                    return `<option value="${txn.id}">${label}</option>`;
+                }).join('');
+
+                receiptsTable.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Status</th>
+                                <th>Merchant</th>
+                                <th>Total</th>
+                                <th>Match Transaction</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${receipts.map(receipt => `
+                                <tr data-id="${receipt.id}">
+                                    <td>${receipt.filename}</td>
+                                    <td>${receipt.status}</td>
+                                    <td>${receipt.extracted?.merchant || ''}</td>
+                                    <td>${receipt.extracted?.total ? receipt.extracted.total.toFixed(2) : ''}</td>
+                                    <td>
+                                        <select data-transaction>
+                                            <option value="">Select transaction</option>
+                                            ${options}
+                                        </select>
+                                    </td>
+                                    <td><button class="secondary" data-link>Link</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                receiptsTable.querySelectorAll('button[data-link]').forEach(button => {
+                    button.addEventListener('click', async () => {
+                        const row = button.closest('tr');
+                        const transactionId = row.querySelector('[data-transaction]').value;
+                        if (!transactionId) {
+                            showStatus(receiptStatus, 'Select a transaction to link.', true);
+                            return;
+                        }
+                        try {
+                            await linkReceipt(row.dataset.id, { transactionId });
+                            await loadReceipts();
+                        } catch (error) {
+                            showStatus(receiptStatus, `Link failed: ${error.message}`, true);
+                        }
+                    });
+                });
+            } catch (error) {
+                receiptsTable.innerHTML = `<p style="color: red">Failed to load receipts: ${error.message}</p>`;
             }
         }
     </script>

@@ -8,6 +8,20 @@ export class MockFirestore {
         }
     };
 
+    batch() {
+        const operations: Array<() => Promise<void>> = [];
+        return {
+            set: (docRef: { set: (data: any) => Promise<void> }, data: any) => {
+                operations.push(() => docRef.set(data));
+            },
+            commit: async () => {
+                for (const operation of operations) {
+                    await operation();
+                }
+            }
+        };
+    }
+
     collection(name: string) {
         return {
             doc: (id: string) => {
@@ -26,6 +40,11 @@ export class MockFirestore {
                     update: async (newData: any) => {
                         if (!this.data[name]?.[id]) throw new Error('Document not found');
                         this.data[name][id] = { ...this.data[name][id], ...newData };
+                    },
+                    delete: async () => {
+                        if (this.data[name]?.[id]) {
+                            delete this.data[name][id];
+                        }
                     }
                 };
             },
@@ -51,7 +70,8 @@ export class MockStorage {
     bucket() {
         return {
             file: (name: string) => ({
-                getSignedUrl: async () => [`https://storage.googleapis.com/mock-bucket/${name}?token=mock`]
+                getSignedUrl: async () => [`https://storage.googleapis.com/mock-bucket/${name}?token=mock`],
+                download: async () => [Buffer.from('', 'utf-8')]
             })
         };
     }
