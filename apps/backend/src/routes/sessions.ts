@@ -14,7 +14,6 @@ const removeUndefined = <T extends Record<string, unknown>>(data: T): T => {
 };
 
 const isNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
-
 // POST /api/sessions: Create or Update Session
 router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
     try {

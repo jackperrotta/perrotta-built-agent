@@ -260,6 +260,56 @@ const createJournalEntryForTransaction = async (
     return entryId;
 };
 
+const extractFilename = (pathValue?: string) => {
+    if (!pathValue) return undefined;
+    try {
+        if (pathValue.startsWith('file://')) {
+            const url = new URL(pathValue);
+            const segments = url.pathname.split('/').filter(Boolean);
+            return segments[segments.length - 1];
+        }
+    } catch {
+        // fall through to string parsing
+    }
+
+    const cleaned = pathValue.split('?')[0];
+    const parts = cleaned.split('/').filter(Boolean);
+    return parts[parts.length - 1];
+};
+
+const normalizeReceiptExtraction = (payload?: ReceiptExtraction | Record<string, unknown>) => {
+    if (!payload) return undefined;
+    const anyPayload = payload as Record<string, unknown>;
+    const total = typeof anyPayload.total === 'number'
+        ? anyPayload.total
+        : typeof anyPayload.totalAmount === 'number'
+            ? anyPayload.totalAmount
+            : undefined;
+    const merchant = typeof anyPayload.merchant === 'string'
+        ? anyPayload.merchant
+        : typeof anyPayload.merchantName === 'string'
+            ? anyPayload.merchantName
+            : undefined;
+    const rawDate = typeof anyPayload.date === 'number' ? anyPayload.date : undefined;
+    const normalizedDate = rawDate && rawDate < 1_000_000_000_000 ? rawDate * 1000 : rawDate;
+
+    return {
+        merchant,
+        total,
+        tax: typeof anyPayload.tax === 'number' ? anyPayload.tax : undefined,
+        date: normalizedDate,
+        currency: typeof anyPayload.currency === 'string' ? anyPayload.currency : undefined,
+        confidence: typeof anyPayload.confidence === 'number' ? anyPayload.confidence : undefined,
+        rawText: typeof anyPayload.rawText === 'string' ? anyPayload.rawText : undefined
+    };
+};
+
+const stripUndefined = <T extends Record<string, unknown>>(data: T): T => {
+    return Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
+    ) as T;
+};
+
 const findMatchingTransaction = async (amount?: number, date?: number) => {
     if (!Number.isFinite(amount) || !Number.isFinite(date)) return undefined;
     const snapshot = await transactionsCollection.orderBy('date', 'desc').get();
@@ -799,27 +849,29 @@ router.post('/transactions/:id/categorize', verifyToken, async (req: Authenticat
 router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const body = req.body as Partial<Receipt>;
-        if (!body.filename) {
+        const filename = body.filename || extractFilename((body as { imagePath?: string }).imagePath);
+        if (!filename) {
             return res.status(400).json({ error: 'filename is required.' });
         }
 
         const now = Date.now();
         const receiptId = body.id || crypto.randomUUID();
-        const storagePath = body.storagePath || `accounting/receipts/${receiptId}/${body.filename}`;
+        const storagePath = body.storagePath || `accounting/receipts/${receiptId}/${filename}`;
+        const extracted = normalizeReceiptExtraction(body.extracted as ReceiptExtraction);
         const record: Receipt = {
             id: receiptId,
-            filename: body.filename,
+            filename,
             storagePath,
             contentType: body.contentType,
             status: 'uploaded',
-            extracted: body.extracted,
+            extracted,
             linkedTransactionId: body.linkedTransactionId,
             createdBy: req.user?.uid || 'unknown',
             createdAt: now,
             updatedAt: now
         };
 
-        await receiptsCollection.doc(receiptId).set(record);
+        await receiptsCollection.doc(receiptId).set(stripUndefined(record as Record<string, unknown>));
 
         let uploadUrl: string | undefined;
         if (body.contentType) {
@@ -829,7 +881,7 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
         res.json({ status: 'success', receipt: record, uploadUrl });
     } catch (error) {
         console.error('Error creating receipt:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
     }
 });
 
@@ -863,7 +915,7 @@ router.get('/receipts/:id', verifyToken, async (req: AuthenticatedRequest, res: 
 router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const receiptId = req.params.id;
-        const body = req.body as { rawText?: string; extracted?: ReceiptExtraction };
+        const body = req.body as { rawText?: string; extracted?: ReceiptExtraction | Record<string, unknown> };
         const docRef = receiptsCollection.doc(receiptId);
         const doc = await docRef.get();
         if (!doc.exists) {
@@ -881,10 +933,11 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             return res.status(400).json({ error: 'rawText or extracted data is required for processing.' });
         }
 
-        const extracted = body.extracted
+        const normalizedExtracted = normalizeReceiptExtraction(body.extracted as Record<string, unknown>);
+        const extracted = normalizedExtracted
             ? {
-                ...body.extracted,
-                rawText: body.extracted.rawText || body.rawText
+                ...normalizedExtracted,
+                rawText: normalizedExtracted.rawText || body.rawText
             }
             : extractReceiptData(body.rawText);
         let linkedTransactionId: string | undefined;
@@ -897,13 +950,13 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             });
         }
 
-        await docRef.update({
+        await docRef.update(stripUndefined({
             status: 'processed',
             extracted,
             linkedTransactionId,
             processedAt: Date.now(),
             updatedAt: Date.now()
-        });
+        }));
 
         res.json({ status: 'success', linkedTransactionId });
     } catch (error) {
@@ -913,7 +966,7 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             errorMessage: error instanceof Error ? error.message : 'Processing error',
             updatedAt: Date.now()
         });
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Internal Server Error' });
     }
 });
 

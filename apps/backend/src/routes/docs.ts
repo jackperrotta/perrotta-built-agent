@@ -643,12 +643,27 @@ const docsHtml = `
         <p>Create a receipt record and get an upload URL.</p>
         <h4>Request Fields</h4>
         <pre>{
-  "filename": "string (required)",
-  "contentType": "string (required for uploadUrl)"
+  "filename": "string (required if imagePath not provided)",
+  "imagePath": "string (optional file:// path, used to infer filename)",
+  "contentType": "string (required for uploadUrl)",
+  "extracted": {
+    "merchant": "string",
+    "merchantName": "string",
+    "total": "number",
+    "totalAmount": "number",
+    "date": "number (ms or seconds)",
+    "currency": "string",
+    "rawText": "string"
+  }
 }</pre>
         <h4>Request Body</h4>
         <pre>{
   "filename": "receipt.jpg",
+  "contentType": "image/jpeg"
+}</pre>
+        <h4>Request Body (using imagePath)</h4>
+        <pre>{
+  "imagePath": "file:///var/mobile/.../receipt.jpg",
   "contentType": "image/jpeg"
 }</pre>
         <h4>Response</h4>
@@ -666,9 +681,11 @@ const docsHtml = `
   "rawText": "string",
   "extracted": {
     "merchant": "string",
+    "merchantName": "string",
     "total": "number",
+    "totalAmount": "number",
     "tax": "number",
-    "date": "number (ms)",
+    "date": "number (ms or seconds)",
     "currency": "string",
     "confidence": "number",
     "rawText": "string"
