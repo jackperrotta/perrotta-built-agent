@@ -62,6 +62,18 @@ The repository is organized as an npm workspace:
 -   **Authentication**: Bearer Token middleware integrated with Firebase Auth.
 -   **API Documentation**: Live documentation endpoint at `/api/docs`.
 -   **Unified Serving**: Backend service hosts the Frontend static files for simple single-service deployment.
+-   **Projects (Project Management)**:
+    -   Project lifecycle endpoints at `/api/projects` with address parsing, auto-naming, and scan linkage.
+    -   Supports statuses: `estimate`, `active`, `on_hold`, `completed`, `archived`.
+-   **Accounting & Bookkeeping (Phase 1-2)**:
+    -   Chart of Accounts seeding and CRUD.
+    -   Journal entries with double-entry validation.
+    -   P&L and Balance Sheet reporting.
+    -   Statement import, transaction categorization, and rule-based auto-coding.
+-   **Receipts (Phase 3)**:
+    -   Receipt ingestion, processing, and transaction linking.
+    -   Receipt enrichment pipeline with AI + logs in `receipts_enrichment_logs`.
+    -   Manual enrichment endpoints for debugging.
 -   **Interactive Floorplan Visualization**:
     -   **Custom Parser**: In-browser conversion of Apple RoomPlan JSON (`.json` or `.zip`) to schematic SVG floorplans.
     -   **Smart Rendering**: 
@@ -97,6 +109,63 @@ MOCK_FIREBASE=true npm run dev
 Verify endpoints using the included script:
 ```bash
 ./test_endpoints.sh
+```
+
+## 💼 Accounting & Receipts
+
+### Overview
+This codebase includes a full accounting subsystem built around double-entry bookkeeping and AI-assisted receipt enrichment. It is designed to power both the web dashboard and the iOS app with consistent APIs.
+
+### Core Collections
+- `accounts` — Chart of Accounts (CoA)
+- `journalEntries` — double-entry ledger entries
+- `imports` — statement imports
+- `transactions` — bank line items
+- `rules` — auto-categorization rules
+- `receipts` — receipt documents
+- `receipts_enrichment_logs` — AI enrichment log entries
+- `projects` — project management and scan linkage
+- `merchants` — normalized merchant registry
+
+### Key APIs (Accounting)
+- `POST /api/accounting/accounts/seed`
+- `GET /api/accounting/accounts`
+- `POST /api/accounting/journal-entries`
+- `GET /api/accounting/journal-entries`
+- `GET /api/accounting/reports/pl`
+- `GET /api/accounting/reports/balance-sheet`
+
+### Key APIs (Statements & Transactions)
+- `POST /api/accounting/imports`
+- `POST /api/accounting/imports/:id/process`
+- `GET /api/accounting/transactions`
+- `POST /api/accounting/transactions/:id/categorize`
+- `GET /api/accounting/rules`
+- `POST /api/accounting/rules`
+
+### Key APIs (Projects)
+- `POST /api/projects`
+- `GET /api/projects`
+- `GET /api/projects/:id`
+- `PUT /api/projects/:id`
+- `DELETE /api/projects/:id`
+
+### Key APIs (Receipts)
+- `POST /api/accounting/receipts`
+- `POST /api/accounting/receipts/:id/process`
+- `POST /api/accounting/receipts/:id/enrich`
+- `POST /api/accounting/receipts/enrich`
+- `POST /api/accounting/receipts/:id/link-transaction`
+- `GET /api/accounting/receipts`
+
+### AI Receipt Enrichment
+AI enrichment runs automatically on receipt upload and processing when `OPENAI_API_KEY` is set in the environment. It writes normalized fields (merchant, totals, line items, etc.) and logs every run to `receipts_enrichment_logs`.
+
+### One-time Receipt Enrichment Script
+Use the one-off script to re-run enrichment on existing receipts:
+```bash
+cd apps/backend
+npx tsx scripts/run-receipt-enrichment.ts
 ```
 
 ## 📦 Deployment Strategy

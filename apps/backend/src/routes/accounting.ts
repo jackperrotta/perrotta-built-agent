@@ -1011,6 +1011,7 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
         const receiptId = body.id || crypto.randomUUID();
         const storagePath = body.storagePath || `accounting/receipts/${receiptId}/${filename}`;
         const extracted = normalizeReceiptExtraction(body.extracted as ReceiptExtraction);
+        const cleanedExtracted = extracted ? stripUndefined(extracted as Record<string, unknown>) as ReceiptExtraction : undefined;
         const details = normalizeReceiptDetails(body as Record<string, unknown>);
         const mergedDetails = {
             ...details,
@@ -1028,7 +1029,7 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
             storagePath,
             contentType: body.contentType,
             status: 'uploaded',
-            extracted,
+            extracted: cleanedExtracted,
             rawOcrText: details.rawOcrText,
             rawLines: details.rawLines,
             parsedSource: details.parsedSource,
@@ -1133,6 +1134,7 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
                 rawText: normalizedExtracted.rawText || body.rawText
             }
             : extractReceiptData(body.rawText);
+        const cleanedExtracted = stripUndefined(extracted as Record<string, unknown>) as ReceiptExtraction;
 
         const details = normalizeReceiptDetails({
             ...((body.extracted || {}) as Record<string, unknown>),
@@ -1160,7 +1162,7 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
 
         await docRef.update(stripUndefined({
             status: 'processed',
-            extracted,
+            extracted: cleanedExtracted,
             rawOcrText: details.rawOcrText,
             rawLines: details.rawLines,
             parsedSource: details.parsedSource,
