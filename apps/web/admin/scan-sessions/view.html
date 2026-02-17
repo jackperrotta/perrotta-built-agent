@@ -90,6 +90,91 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .debug-grid label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 0.3rem;
+            color: #444;
+        }
+
+        .debug-grid input,
+        .debug-grid select {
+            width: 100%;
+            padding: 0.45rem;
+            border-radius: 6px;
+            border: 1px solid #cfcfcf;
+        }
+
+        .debug-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+
+        .debug-actions button {
+            padding: 0.45rem 0.75rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #1f5fbf;
+            color: white;
+        }
+
+        .debug-status {
+            font-size: 0.9rem;
+            color: #234;
+        }
+
+        .debug-block {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            background: #fafafa;
+        }
+
+        .debug-block h4 {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .debug-list {
+            margin: 0.25rem 0 0 1rem;
+        }
+
+        .json-raw {
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.85rem;
+            background: #f0f0f0;
+            padding: 0.75rem;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        .layout-preview-wrap {
+            margin: 0.5rem 0 0.75rem 0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            padding: 0.5rem;
+        }
+
+        .layout-preview-svg {
+            width: 100%;
+            height: 300px;
+            background: #fbfbfb;
+            border-radius: 4px;
+            display: block;
+        }
     </style>
 </head>
 
@@ -99,10 +184,67 @@
         <h1 id="session-title">Session Details</h1>
     </header>
 
+    <div class="card">
+        <h2>Layout Engine Debug</h2>
+        <p>Manual admin-only debug trigger. Verbose diagnostics are intentionally returned.</p>
+        <div class="debug-grid">
+            <div>
+                <label for="debug-segment">Segment</label>
+                <select id="debug-segment"></select>
+            </div>
+            <div>
+                <label for="debug-building-type">Building Type</label>
+                <input id="debug-building-type" placeholder="single_family" />
+            </div>
+            <div>
+                <label for="debug-unit-count">Unit Count</label>
+                <input id="debug-unit-count" type="number" min="1" />
+            </div>
+            <div>
+                <label for="debug-bed-min">Bedrooms Min</label>
+                <input id="debug-bed-min" type="number" min="0" />
+            </div>
+            <div>
+                <label for="debug-bed-max">Bedrooms Max</label>
+                <input id="debug-bed-max" type="number" min="0" />
+            </div>
+            <div>
+                <label for="debug-bath-min">Bathrooms Min</label>
+                <input id="debug-bath-min" type="number" min="0" />
+            </div>
+            <div>
+                <label for="debug-bath-max">Bathrooms Max</label>
+                <input id="debug-bath-max" type="number" min="0" />
+            </div>
+            <div>
+                <label for="debug-market-goal">Market Goal</label>
+                <select id="debug-market-goal">
+                    <option value="">Select</option>
+                    <option value="flip">flip</option>
+                    <option value="rental">rental</option>
+                    <option value="resale">resale</option>
+                </select>
+            </div>
+            <div>
+                <label for="debug-jurisdiction">Jurisdiction</label>
+                <input id="debug-jurisdiction" placeholder="PA-Philadelphia" />
+            </div>
+            <div>
+                <label for="debug-topk">Top K</label>
+                <input id="debug-topk" type="number" min="1" value="10" />
+            </div>
+        </div>
+        <div class="debug-actions">
+            <button id="run-layout-debug-btn">Run Layout Engine (Debug)</button>
+            <span id="layout-debug-status" class="debug-status"></span>
+        </div>
+        <div id="layout-debug-output"></div>
+    </div>
+
     <div id="content">Loading details...</div>
 
     <script type="module">
-        import { onAuthChange } from '../../src/auth.js';
+        import { onAuthChange, getToken } from '../../src/auth.js';
         import { getSessionById } from '../../src/services/sessionService.js';
         import { storage } from '../../src/config/firebase-config.js';
         import { ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
@@ -110,6 +252,33 @@
 
         const contentDiv = document.getElementById('content');
         const titleHeader = document.getElementById('session-title');
+        const API_BASE = window.location.hostname === 'localhost' && window.location.port === '3000'
+            ? 'http://localhost:8080'
+            : '';
+        const debugSegmentSelect = document.getElementById('debug-segment');
+        const debugBuildingTypeInput = document.getElementById('debug-building-type');
+        const debugUnitCountInput = document.getElementById('debug-unit-count');
+        const debugBedMinInput = document.getElementById('debug-bed-min');
+        const debugBedMaxInput = document.getElementById('debug-bed-max');
+        const debugBathMinInput = document.getElementById('debug-bath-min');
+        const debugBathMaxInput = document.getElementById('debug-bath-max');
+        const debugMarketGoalSelect = document.getElementById('debug-market-goal');
+        const debugJurisdictionInput = document.getElementById('debug-jurisdiction');
+        const debugTopKInput = document.getElementById('debug-topk');
+        const runLayoutDebugBtn = document.getElementById('run-layout-debug-btn');
+        const layoutDebugStatus = document.getElementById('layout-debug-status');
+        const layoutDebugOutput = document.getElementById('layout-debug-output');
+
+        // Seed explicit defaults for debug intent so placeholder text is not mistaken for actual values.
+        if (!debugBuildingTypeInput.value) debugBuildingTypeInput.value = 'single_family';
+        if (!debugUnitCountInput.value) debugUnitCountInput.value = '1';
+        if (!debugBedMinInput.value) debugBedMinInput.value = '1';
+        if (!debugBedMaxInput.value) debugBedMaxInput.value = '3';
+        if (!debugBathMinInput.value) debugBathMinInput.value = '1';
+        if (!debugBathMaxInput.value) debugBathMaxInput.value = '2';
+        if (!debugMarketGoalSelect.value) debugMarketGoalSelect.value = 'flip';
+        if (!debugJurisdictionInput.value) debugJurisdictionInput.value = 'PA-Philadelphia';
+        if (!debugTopKInput.value) debugTopKInput.value = '10';
 
         async function resolveUrl(path) {
             if (!path) return null;
@@ -129,6 +298,7 @@
 
         if (!sessionId) {
             contentDiv.innerHTML = '<p style="color: red">No Session ID provided.</p>';
+            runLayoutDebugBtn.disabled = true;
         }
 
         onAuthChange(async (user) => {
@@ -140,6 +310,425 @@
                 loadSessionDetails(sessionId);
             }
         });
+
+        runLayoutDebugBtn.addEventListener('click', async () => {
+            if (!sessionId) return;
+            const payload = buildDebugPayload();
+            if (!payload) {
+                return;
+            }
+
+            const token = await getToken();
+            if (!token) {
+                layoutDebugStatus.textContent = 'Auth token unavailable.';
+                return;
+            }
+
+            const startedAt = new Date();
+            layoutDebugStatus.textContent = `Running... ${startedAt.toLocaleTimeString()}`;
+            layoutDebugOutput.innerHTML = '';
+            runLayoutDebugBtn.disabled = true;
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/scans/${sessionId}/layout-debug`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data?.error || 'Debug endpoint failed.');
+                }
+
+                const finishedAt = new Date();
+                layoutDebugStatus.textContent = `Completed ${finishedAt.toLocaleTimeString()}`;
+                renderLayoutDebugResult(data);
+            } catch (error) {
+                layoutDebugStatus.textContent = `Failed ${new Date().toLocaleTimeString()}`;
+                layoutDebugOutput.innerHTML = `<div class="debug-block"><h4>Error</h4><p>${error.message}</p></div>`;
+            } finally {
+                runLayoutDebugBtn.disabled = false;
+            }
+        });
+
+        function buildDebugPayload() {
+            const missing = [];
+
+            const buildingType = debugBuildingTypeInput.value.trim();
+            const unitCount = Number(debugUnitCountInput.value);
+            const bedroomMin = Number(debugBedMinInput.value);
+            const bedroomMax = Number(debugBedMaxInput.value);
+            const bathroomMin = Number(debugBathMinInput.value);
+            const bathroomMax = Number(debugBathMaxInput.value);
+            const marketGoal = debugMarketGoalSelect.value;
+            const jurisdiction = debugJurisdictionInput.value.trim();
+            const topK = Number(debugTopKInput.value || 10);
+
+            if (!buildingType) missing.push('Building Type');
+            if (!Number.isFinite(unitCount) || unitCount < 1) missing.push('Unit Count (must be >= 1)');
+            if (!Number.isFinite(bedroomMin)) missing.push('Bedrooms Min');
+            if (!Number.isFinite(bedroomMax)) missing.push('Bedrooms Max');
+            if (!Number.isFinite(bathroomMin)) missing.push('Bathrooms Min');
+            if (!Number.isFinite(bathroomMax)) missing.push('Bathrooms Max');
+            if (!marketGoal) missing.push('Market Goal');
+            if (!jurisdiction) missing.push('Jurisdiction');
+            if (!Number.isFinite(topK) || topK < 1) missing.push('Top K (must be >= 1)');
+            if (Number.isFinite(bedroomMin) && Number.isFinite(bedroomMax) && bedroomMin > bedroomMax) {
+                missing.push('Bedrooms range (min must be <= max)');
+            }
+            if (Number.isFinite(bathroomMin) && Number.isFinite(bathroomMax) && bathroomMin > bathroomMax) {
+                missing.push('Bathrooms range (min must be <= max)');
+            }
+
+            if (missing.length > 0) {
+                layoutDebugStatus.textContent = `Missing/invalid fields: ${missing.join(', ')}`;
+                return null;
+            }
+
+            return {
+                segmentId: debugSegmentSelect.value || undefined,
+                topK,
+                intent: {
+                    buildingType,
+                    unitCount,
+                    bedroomRange: {
+                        min: bedroomMin,
+                        max: bedroomMax
+                    },
+                    bathroomRange: {
+                        min: bathroomMin,
+                        max: bathroomMax
+                    },
+                    marketGoal,
+                    jurisdiction
+                }
+            };
+        }
+
+        function renderLayoutDebugResult(result) {
+            const summary = result.summary || {};
+            const defaults = result.assumptionsAndDefaults || {};
+            const candidates = Array.isArray(result.rankedCandidates) ? result.rankedCandidates : [];
+            const modelSpace = result?.rawDiagnosticMetadata?.modelSpaceFromEngine || result?.metadata?.modelSpace || null;
+            const envelopePolygon = Array.isArray(result?.rawDiagnosticMetadata?.envelopePolygonFromEngine)
+                ? result.rawDiagnosticMetadata.envelopePolygonFromEngine
+                : [];
+            const scanStats = result?.rawDiagnosticMetadata?.scanGeometryStats || null;
+
+            const summaryHtml = `
+                <div class="debug-block">
+                    <h4>Summary</h4>
+                    <ul class="debug-list">
+                        <li>Runtime: ${result.runtimeMs} ms</li>
+                        <li>Candidates: ${result.candidateCount}</li>
+                        <li>Attempts: ${summary.attemptsExecuted}/${summary.attemptsRequested}</li>
+                        <li>Retries observed: ${summary.retriesObserved}</li>
+                    </ul>
+                </div>
+            `;
+
+            const modelSpaceHtml = `
+                <div class="debug-block">
+                    <h4>Model Space Target (Scan-Derived Envelope)</h4>
+                    ${modelSpace ? `
+                        <ul class="debug-list">
+                            <li>Width: ${Number(modelSpace.widthFt).toFixed(2)} ft</li>
+                            <li>Height: ${Number(modelSpace.heightFt).toFixed(2)} ft</li>
+                            <li>Area: ${Number(modelSpace.areaSqFt).toFixed(2)} sq ft</li>
+                            <li>Fill target area: ${Number(modelSpace.fillTargetAreaSqFt).toFixed(2)} sq ft</li>
+                            <li>Tolerance band: ${Number(modelSpace.toleranceFt).toFixed(2)} ft</li>
+                            <li>Scan confidence: ${Number(modelSpace.confidence).toFixed(3)}</li>
+                        </ul>
+                    ` : '<p>Model-space dimensions were not returned by the engine.</p>'}
+                    ${scanStats ? `
+                        <p><strong>Scan wall stats:</strong></p>
+                        <ul class="debug-list">
+                            <li>Wall count: ${scanStats.wallCount}</li>
+                            <li>Max wall length: ${Number(scanStats.maxWallLengthFt).toFixed(2)} ft</li>
+                            <li>Avg wall length: ${Number(scanStats.avgWallLengthFt).toFixed(2)} ft</li>
+                            <li>Top-5 wall lengths: ${(Array.isArray(scanStats.wallLengthsFtTop5) ? scanStats.wallLengthsFtTop5 : []).map(v => `${Number(v).toFixed(2)} ft`).join(', ') || 'n/a'}</li>
+                        </ul>
+                    ` : ''}
+                </div>
+            `;
+
+            const assumptionsHtml = `
+                <div class="debug-block">
+                    <h4>Assumptions & Defaults</h4>
+                    <p><strong>Explicit fields:</strong> ${(defaults.explicitFields || []).join(', ') || 'None'}</p>
+                    <p><strong>Defaulted fields:</strong> ${(defaults.defaultedFields || []).join(', ') || 'None'}</p>
+                    <p><strong>Engine assumptions:</strong></p>
+                    <ul class="debug-list">
+                        ${(defaults.engineAssumptions || []).map(a => `<li>${a}</li>`).join('') || '<li>None</li>'}
+                    </ul>
+                    <p><strong>Engine errors:</strong></p>
+                    <ul class="debug-list">
+                        ${(defaults.engineErrors || []).map(e => `<li>${e}</li>`).join('') || '<li>None</li>'}
+                    </ul>
+                </div>
+            `;
+
+            const candidateHtml = `
+                <div class="debug-block">
+                    <h4>Ranked Candidates</h4>
+                    ${(candidates || []).map(c => `
+                        <details>
+                            <summary>#${c.rank} ${c.candidateId} (totalScore=${c.totalScore})</summary>
+                            <div class="layout-preview-wrap">
+                                ${renderCandidateLayoutSvg(c, envelopePolygon)}
+                            </div>
+                            <p><strong>Category scores:</strong></p>
+                            <div class="json-raw">${escapeHtml(JSON.stringify(c.categoryScores, null, 2))}</div>
+                            <p><strong>Hard failures:</strong></p>
+                            <div class="json-raw">${escapeHtml(JSON.stringify(c.hardFailures, null, 2))}</div>
+                            <p><strong>Soft penalties:</strong></p>
+                            <div class="json-raw">${escapeHtml(JSON.stringify(c.softPenalties, null, 2))}</div>
+                            <p><strong>Assumptions:</strong></p>
+                            <ul class="debug-list">${(c.assumptions || []).map(a => `<li>${a}</li>`).join('') || '<li>None</li>'}</ul>
+                        </details>
+                    `).join('') || '<p>No candidates returned.</p>'}
+                </div>
+            `;
+
+            const rawHtml = `
+                <div class="debug-block">
+                    <details>
+                        <summary>Raw JSON Payload</summary>
+                        <div class="json-raw">${escapeHtml(JSON.stringify(result, null, 2))}</div>
+                    </details>
+                </div>
+            `;
+
+            layoutDebugOutput.innerHTML = `${summaryHtml}${modelSpaceHtml}${assumptionsHtml}${candidateHtml}${rawHtml}`;
+        }
+
+        function renderCandidateLayoutSvg(candidate, envelopePolygon) {
+            const rooms = Array.isArray(candidate.rooms) ? candidate.rooms : [];
+            if (rooms.length === 0) {
+                return '<p>No room geometry returned for this candidate.</p>';
+            }
+
+            const points = rooms.flatMap(room => Array.isArray(room.polygon) ? room.polygon : []);
+            if (points.length === 0) {
+                return '<p>Room polygons are empty for this candidate.</p>';
+            }
+
+            const xs = points.map(p => p.x);
+            const ys = points.map(p => p.y);
+            const minX = Math.min(...xs);
+            const minY = Math.min(...ys);
+            const maxX = Math.max(...xs);
+            const maxY = Math.max(...ys);
+            const width = Math.max(1, maxX - minX);
+            const height = Math.max(1, maxY - minY);
+            const pad = 2;
+            const viewBox = `${minX - pad} ${minY - pad} ${width + pad * 2} ${height + pad * 2}`;
+            const overlapPairs = findRoomOverlaps(rooms);
+            const overlappingRoomIds = new Set(overlapPairs.flatMap(pair => [pair.a.id, pair.b.id]));
+            const roomArea = rooms.reduce((acc, room) => acc + Number(room.areaSqFt || 0), 0);
+            const envelopeArea = polygonArea(Array.isArray(envelopePolygon) ? envelopePolygon : []);
+            const envelopePath = Array.isArray(envelopePolygon) && envelopePolygon.length >= 3
+                ? `<polygon points="${envelopePolygon.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#111" stroke-width="0.6" stroke-dasharray="1.5 1.5"></polygon>`
+                : '';
+
+            console.group(`[LayoutDebug] ${candidate.candidateId} overlap analysis`);
+            console.log('roomCount:', rooms.length);
+            console.log('overlapPairCount:', overlapPairs.length);
+            if (overlapPairs.length > 0) {
+                overlapPairs.forEach((pair, idx) => {
+                    console.log(
+                        `pair#${idx + 1}: ${pair.a.id} <-> ${pair.b.id}`,
+                        {
+                            aBounds: pair.a.bounds,
+                            bBounds: pair.b.bounds,
+                            xOverlapFt: pair.xOverlapFt,
+                            yOverlapFt: pair.yOverlapFt
+                        }
+                    );
+                });
+            } else {
+                console.log('No overlaps detected for this candidate.');
+            }
+            console.groupEnd();
+
+            const roomPaths = rooms.map((room, idx) => {
+                const polygon = Array.isArray(room.polygon) ? room.polygon : [];
+                if (polygon.length < 3) return '';
+
+                const color = roomColor(room.roomType, idx);
+                const pointsStr = polygon.map(p => `${p.x},${p.y}`).join(' ');
+                const cx = polygon.reduce((acc, p) => acc + p.x, 0) / polygon.length;
+                const cy = polygon.reduce((acc, p) => acc + p.y, 0) / polygon.length;
+                const label = `${room.roomType || 'room'} (${Math.round(room.areaSqFt || 0)} sf)`;
+                const isOverlapping = overlappingRoomIds.has(room.id);
+
+                return `
+                    <polygon points="${pointsStr}" fill="${color}" fill-opacity="0.45" stroke="${isOverlapping ? '#d90429' : '#222'}" stroke-width="${isOverlapping ? '0.7' : '0.3'}"></polygon>
+                    <text x="${cx}" y="${cy}" font-size="1.4" text-anchor="middle" fill="#111">${escapeHtml(label)}</text>
+                `;
+            }).join('');
+
+            return `
+                <p><strong>Overlap pairs:</strong> ${overlapPairs.length}${overlapPairs.length > 0 ? ` (${[...overlappingRoomIds].join(', ')})` : ''}</p>
+                <p><strong>Candidate bounds:</strong> ${width.toFixed(2)} ft x ${height.toFixed(2)} ft | <strong>Room area:</strong> ${roomArea.toFixed(2)} sq ft${envelopeArea > 0 ? ` | <strong>Envelope area:</strong> ${envelopeArea.toFixed(2)} sq ft` : ''}</p>
+                <svg class="layout-preview-svg" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                    ${envelopePath}
+                    ${roomPaths}
+                </svg>
+            `;
+        }
+
+        function findRoomOverlaps(rooms) {
+            const overlaps = [];
+            const roomShapes = rooms
+                .map(room => {
+                    const polygon = Array.isArray(room.polygon) ? room.polygon : [];
+                    if (polygon.length < 3) return null;
+                    return {
+                        id: room.id,
+                        roomType: room.roomType,
+                        polygon
+                    };
+                })
+                .filter(Boolean);
+
+            for (let i = 0; i < roomShapes.length; i++) {
+                for (let j = i + 1; j < roomShapes.length; j++) {
+                    const a = roomShapes[i];
+                    const b = roomShapes[j];
+                    const overlapSqFt = polygonOverlapArea(a.polygon, b.polygon);
+                    if (overlapSqFt > 0.1) {
+                        overlaps.push({
+                            a: { id: a.id, roomType: a.roomType, bounds: polygonBounds(a.polygon) },
+                            b: { id: b.id, roomType: b.roomType, bounds: polygonBounds(b.polygon) },
+                            overlapSqFt
+                        });
+                    }
+                }
+            }
+            return overlaps;
+        }
+
+        function roomColor(roomType, index) {
+            const palette = {
+                living_room: '#86b7fe',
+                kitchen: '#ffe08a',
+                bedroom: '#b7e4c7',
+                bathroom: '#9bf6ff',
+                dining_room: '#ffd6a5',
+                hallway: '#dee2e6',
+                office: '#cdb4db',
+                laundry: '#caf0f8',
+                closet: '#f8edeb',
+                utility: '#e9ecef',
+                stairwell: '#adb5bd',
+                deck: '#d9d9d9'
+            };
+            if (palette[roomType]) {
+                return palette[roomType];
+            }
+            const fallback = ['#e3f2fd', '#fce4ec', '#e8f5e9', '#fff3cd', '#ede7f6'];
+            return fallback[index % fallback.length];
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;');
+        }
+
+        function polygonArea(polygon) {
+            if (!Array.isArray(polygon) || polygon.length < 3) return 0;
+            let sum = 0;
+            for (let i = 0; i < polygon.length; i++) {
+                const a = polygon[i];
+                const b = polygon[(i + 1) % polygon.length];
+                sum += (a.x * b.y) - (b.x * a.y);
+            }
+            return Math.abs(sum) * 0.5;
+        }
+
+        function polygonBounds(polygon) {
+            const xs = polygon.map(p => p.x);
+            const ys = polygon.map(p => p.y);
+            return {
+                minX: Math.min(...xs),
+                minY: Math.min(...ys),
+                maxX: Math.max(...xs),
+                maxY: Math.max(...ys)
+            };
+        }
+
+        function polygonOverlapArea(subject, clip) {
+            if (!Array.isArray(subject) || subject.length < 3 || !Array.isArray(clip) || clip.length < 3) return 0;
+            let output = [...subject];
+            const clipIsClockwise = signedPolygonArea(clip) < 0;
+
+            for (let i = 0; i < clip.length; i++) {
+                const edgeStart = clip[i];
+                const edgeEnd = clip[(i + 1) % clip.length];
+                const input = output;
+                output = [];
+                if (input.length === 0) break;
+
+                let previous = input[input.length - 1];
+                for (const current of input) {
+                    const currentInside = isInsideHalfPlane(current, edgeStart, edgeEnd, clipIsClockwise);
+                    const previousInside = isInsideHalfPlane(previous, edgeStart, edgeEnd, clipIsClockwise);
+
+                    if (currentInside) {
+                        if (!previousInside) {
+                            const ix = lineSegmentIntersection(previous, current, edgeStart, edgeEnd);
+                            if (ix) output.push(ix);
+                        }
+                        output.push(current);
+                    } else if (previousInside) {
+                        const ix = lineSegmentIntersection(previous, current, edgeStart, edgeEnd);
+                        if (ix) output.push(ix);
+                    }
+                    previous = current;
+                }
+            }
+
+            return output.length >= 3 ? Math.abs(signedPolygonArea(output)) : 0;
+        }
+
+        function signedPolygonArea(polygon) {
+            let sum = 0;
+            for (let i = 0; i < polygon.length; i++) {
+                const a = polygon[i];
+                const b = polygon[(i + 1) % polygon.length];
+                sum += a.x * b.y - b.x * a.y;
+            }
+            return sum * 0.5;
+        }
+
+        function isInsideHalfPlane(point, edgeStart, edgeEnd, clipIsClockwise) {
+            const cross =
+                (edgeEnd.x - edgeStart.x) * (point.y - edgeStart.y) -
+                (edgeEnd.y - edgeStart.y) * (point.x - edgeStart.x);
+            return clipIsClockwise ? cross <= 1e-9 : cross >= -1e-9;
+        }
+
+        function lineSegmentIntersection(a1, a2, b1, b2) {
+            const aDx = a2.x - a1.x;
+            const aDy = a2.y - a1.y;
+            const bDx = b2.x - b1.x;
+            const bDy = b2.y - b1.y;
+            const denom = aDx * bDy - aDy * bDx;
+            if (Math.abs(denom) < 1e-9) return null;
+            const cX = b1.x - a1.x;
+            const cY = b1.y - a1.y;
+            const t = (cX * bDy - cY * bDx) / denom;
+            return {
+                x: a1.x + t * aDx,
+                y: a1.y + t * aDy
+            };
+        }
 
         // Three.js & Needle USD Viewer Helper
         async function initThreeJSViewer(containerId, url) {
@@ -292,6 +881,7 @@
             try {
                 const session = await getSessionById(id);
                 console.log('Session Data:', session);
+                populateDebugSegmentOptions(session);
 
                 // Resolve session-level audio
                 const audioUrl = await resolveUrl(session.audioRemoteURL || session.audioRecordingUrl);
@@ -523,6 +1113,26 @@
 
             } catch (error) {
                 contentDiv.innerHTML = `<p style="color: red">Error loading details: ${error.message}</p>`;
+            }
+        }
+
+        function populateDebugSegmentOptions(session) {
+            debugSegmentSelect.innerHTML = '';
+            const segments = Array.isArray(session.segments) ? session.segments : [];
+            if (segments.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No segments';
+                debugSegmentSelect.appendChild(option);
+                return;
+            }
+
+            for (const segment of segments) {
+                const option = document.createElement('option');
+                option.value = segment.id;
+                const hasJson = segment.roomPlanJSONRemoteURL ? 'json' : 'no-json';
+                option.textContent = `${segment.type} (${segment.id}) - ${hasJson}`;
+                debugSegmentSelect.appendChild(option);
             }
         }
     </script>

@@ -8,6 +8,7 @@
         "dev": "tsx watch src/main.ts"
     },
     "dependencies": {
+        "@construction/layout": "*",
         "@construction/shared": "*",
         "@needle-tools/usd": "^0.0.1-61ded11",
         "cors": "^2.8.5",
