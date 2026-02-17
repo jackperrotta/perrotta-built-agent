@@ -67,6 +67,7 @@ export interface RankedCandidatesResult {
             toleranceFt: number;
             confidence: number;
             fillTargetAreaSqFt: number;
+            extractionStats?: Record<string, unknown>;
         };
         envelopePolygon?: Point[];
     };

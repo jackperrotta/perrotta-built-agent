@@ -23,7 +23,10 @@ export function generateCandidates(context: GenerationContext): RankedCandidates
         areaSqFt: envelopeAreaSqFt,
         toleranceFt: context.normalizedScan.envelope.toleranceFt,
         confidence: context.normalizedScan.envelope.confidence,
-        fillTargetAreaSqFt: envelopeAreaSqFt
+        fillTargetAreaSqFt: envelopeAreaSqFt,
+        extractionStats: {
+            scanNotes: context.normalizedScan.notes
+        }
     };
     logEngine('run-start', {
         targetCandidateCount: target,

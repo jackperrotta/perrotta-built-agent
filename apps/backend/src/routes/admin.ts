@@ -40,6 +40,16 @@ interface LayoutDebugRequestBody {
     topK?: number;
 }
 
+type Point2D = { x: number; y: number };
+type PreviewWallSegment = {
+    id: string;
+    start: Point2D;
+    end: Point2D;
+    lengthFt: number;
+};
+
+const FEET_PER_METER = 3.28084;
+
 // POST /api/admin/scans/:scanSessionId/layout-debug
 router.post('/scans/:scanSessionId/layout-debug', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -120,6 +130,7 @@ router.post('/scans/:scanSessionId/layout-debug', verifyToken, async (req: Authe
             }
         }));
 
+        const exteriorEnvelopePreview = buildExteriorEnvelopePreview(rawScanGeometry);
         const rawMetadata = {
             sessionId: session.id,
             segmentId: segment.id,
@@ -143,6 +154,7 @@ router.post('/scans/:scanSessionId/layout-debug', verifyToken, async (req: Authe
             geometrySource: segment.roomPlanJSONRemoteURL,
             modelSpaceFromEngine: (generated.metadata as unknown as { modelSpace?: unknown }).modelSpace ?? null,
             envelopePolygonFromEngine: (generated.metadata as unknown as { envelopePolygon?: unknown }).envelopePolygon ?? null,
+            exteriorEnvelopePreview,
             scanGeometryStats: buildScanGeometryStats(rawScanGeometry)
         };
 
@@ -385,6 +397,273 @@ function buildScanGeometryStats(scan: RoomPlanJson): {
         avgWallLengthFt,
         wallLengthsFtTop5
     };
+}
+
+function buildExteriorEnvelopePreview(scan: RoomPlanJson): {
+    selectionMethod: string;
+    envelopePolygon: Point2D[];
+    exteriorWalls: Array<{ id: string; lengthFt: number; start: Point2D; end: Point2D }>;
+    stats: Record<string, unknown>;
+} | null {
+    const segments = extractWallSegmentsFeet(scan);
+    if (segments.length < 3) {
+        return null;
+    }
+
+    const outermostSelection = selectOutermostWallIndices(segments, 0.6);
+    const chainExpandedSelection = expandSelectionAlongBoundaryChains(segments, outermostSelection.selectedIndices, 0.9);
+    const selectedIndices = chainExpandedSelection.size > 0 ? chainExpandedSelection : outermostSelection.selectedIndices;
+
+    const selectedSegments = [...selectedIndices]
+        .map((index) => segments[index])
+        .filter((segment): segment is PreviewWallSegment => Boolean(segment));
+
+    if (selectedSegments.length < 3) {
+        return null;
+    }
+
+    const envelopePolygon = convexHull(selectedSegments.flatMap((segment) => [segment.start, segment.end]));
+    if (envelopePolygon.length < 3) {
+        return null;
+    }
+
+    return {
+        selectionMethod: 'outside-most-radial+chain',
+        envelopePolygon,
+        exteriorWalls: selectedSegments
+            .sort((a, b) => b.lengthFt - a.lengthFt)
+            .map((segment) => ({
+                id: segment.id,
+                lengthFt: segment.lengthFt,
+                start: segment.start,
+                end: segment.end
+            })),
+        stats: {
+            wallSegmentCount: segments.length,
+            selectedOutermostCount: outermostSelection.selectedIndices.size,
+            selectedExpandedCount: selectedSegments.length,
+            radial: outermostSelection.stats
+        }
+    };
+}
+
+function extractWallSegmentsFeet(scan: RoomPlanJson): PreviewWallSegment[] {
+    return scan.walls
+        .map((wall, index) => {
+            const dimensions = Array.isArray(wall.dimensions) ? wall.dimensions : [];
+            const transform = Array.isArray(wall.transform) ? wall.transform : [];
+            const widthMeters = Number(dimensions[0] ?? 0);
+            if (!Number.isFinite(widthMeters) || widthMeters <= 0 || transform.length < 15) {
+                return null;
+            }
+
+            const tx = Number(transform[12] ?? 0);
+            const tz = Number(transform[14] ?? 0);
+            const rawRx = Number(transform[0] ?? 1);
+            const rawRz = Number(transform[2] ?? 0);
+            const axisLength = Math.hypot(rawRx, rawRz) || 1;
+            const rx = rawRx / axisLength;
+            const rz = rawRz / axisLength;
+            const halfLen = widthMeters / 2;
+            const startMeters = { x: tx - halfLen * rx, y: tz - halfLen * rz };
+            const endMeters = { x: tx + halfLen * rx, y: tz + halfLen * rz };
+            const start = { x: startMeters.x * FEET_PER_METER, y: startMeters.y * FEET_PER_METER };
+            const end = { x: endMeters.x * FEET_PER_METER, y: endMeters.y * FEET_PER_METER };
+            return {
+                id: wall.id ?? `wall-${index + 1}`,
+                start,
+                end,
+                lengthFt: Math.hypot(end.x - start.x, end.y - start.y)
+            };
+        })
+        .filter((segment): segment is PreviewWallSegment => segment !== null);
+}
+
+function selectOutermostWallIndices(
+    segments: PreviewWallSegment[],
+    baseToleranceFt: number
+): {
+    selectedIndices: Set<number>;
+    stats: {
+        binCount: number;
+        radialSlackFt: number;
+    };
+} {
+    const points = segments.flatMap((segment) => [segment.start, segment.end]);
+    const centroid = {
+        x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+        y: points.reduce((sum, p) => sum + p.y, 0) / points.length
+    };
+    const binCount = Math.max(24, Math.min(72, segments.length * 2));
+    const radialSlackFt = Math.max(0.8, baseToleranceFt * 1.25);
+    const binToMaxRadius = new Map<number, number>();
+    const measurements: Array<{ index: number; bin: number; radius: number }> = [];
+
+    for (let i = 0; i < segments.length; i++) {
+        const midpoint = {
+            x: (segments[i].start.x + segments[i].end.x) / 2,
+            y: (segments[i].start.y + segments[i].end.y) / 2
+        };
+        const dx = midpoint.x - centroid.x;
+        const dy = midpoint.y - centroid.y;
+        const radius = Math.hypot(dx, dy);
+        let angle = Math.atan2(dy, dx);
+        if (angle < 0) {
+            angle += 2 * Math.PI;
+        }
+        const bin = Math.floor((angle / (2 * Math.PI)) * binCount) % binCount;
+        measurements.push({ index: i, bin, radius });
+        const currentMax = binToMaxRadius.get(bin);
+        if (currentMax === undefined || radius > currentMax) {
+            binToMaxRadius.set(bin, radius);
+        }
+    }
+
+    const selectedIndices = new Set<number>();
+    for (const measurement of measurements) {
+        const ownMax = binToMaxRadius.get(measurement.bin) ?? -Infinity;
+        const prevMax = binToMaxRadius.get((measurement.bin - 1 + binCount) % binCount) ?? -Infinity;
+        const nextMax = binToMaxRadius.get((measurement.bin + 1) % binCount) ?? -Infinity;
+        const neighborhoodMax = Math.max(ownMax, prevMax, nextMax);
+        if (measurement.radius >= neighborhoodMax - radialSlackFt) {
+            selectedIndices.add(measurement.index);
+        }
+    }
+
+    return {
+        selectedIndices,
+        stats: {
+            binCount,
+            radialSlackFt
+        }
+    };
+}
+
+function expandSelectionAlongBoundaryChains(
+    segments: PreviewWallSegment[],
+    initialSelection: Set<number>,
+    snapToleranceFt: number
+): Set<number> {
+    if (initialSelection.size === 0) {
+        return new Set<number>();
+    }
+
+    const clusterToNodeId = new Map<string, number>();
+    const segmentNodes: Array<[number, number]> = [];
+    const nodeToSegmentIds = new Map<number, Set<number>>();
+    const nodeNeighbors = new Map<number, Set<number>>();
+    const getNodeId = (point: Point2D): number => {
+        const key = `${Math.round(point.x / snapToleranceFt)}:${Math.round(point.y / snapToleranceFt)}`;
+        const existing = clusterToNodeId.get(key);
+        if (existing !== undefined) {
+            return existing;
+        }
+        const id = clusterToNodeId.size;
+        clusterToNodeId.set(key, id);
+        return id;
+    };
+
+    for (let i = 0; i < segments.length; i++) {
+        const a = getNodeId(segments[i].start);
+        const b = getNodeId(segments[i].end);
+        segmentNodes.push([a, b]);
+
+        const aSegments = nodeToSegmentIds.get(a) ?? new Set<number>();
+        aSegments.add(i);
+        nodeToSegmentIds.set(a, aSegments);
+
+        const bSegments = nodeToSegmentIds.get(b) ?? new Set<number>();
+        bSegments.add(i);
+        nodeToSegmentIds.set(b, bSegments);
+
+        if (a !== b) {
+            const aNeighbors = nodeNeighbors.get(a) ?? new Set<number>();
+            aNeighbors.add(b);
+            nodeNeighbors.set(a, aNeighbors);
+            const bNeighbors = nodeNeighbors.get(b) ?? new Set<number>();
+            bNeighbors.add(a);
+            nodeNeighbors.set(b, bNeighbors);
+        }
+    }
+
+    const nodeDegree = new Map<number, number>();
+    for (const [nodeId, neighbors] of nodeNeighbors) {
+        nodeDegree.set(nodeId, neighbors.size);
+    }
+    for (const nodeId of nodeToSegmentIds.keys()) {
+        if (!nodeDegree.has(nodeId)) {
+            nodeDegree.set(nodeId, 0);
+        }
+    }
+
+    const expanded = new Set<number>(initialSelection);
+    const queue = [...initialSelection];
+    while (queue.length > 0) {
+        const index = queue.shift();
+        if (index === undefined) {
+            continue;
+        }
+        const [a, b] = segmentNodes[index];
+        for (const nodeId of [a, b]) {
+            const degree = nodeDegree.get(nodeId) ?? 0;
+            const isBoundaryNode = degree <= 2;
+            const adjacent = nodeToSegmentIds.get(nodeId);
+            if (!adjacent) {
+                continue;
+            }
+            for (const nextIndex of adjacent) {
+                if (expanded.has(nextIndex)) {
+                    continue;
+                }
+                if (isBoundaryNode || initialSelection.has(nextIndex)) {
+                    expanded.add(nextIndex);
+                    queue.push(nextIndex);
+                }
+            }
+        }
+    }
+
+    return expanded;
+}
+
+function convexHull(points: Point2D[]): Point2D[] {
+    if (points.length <= 1) {
+        return points;
+    }
+    const sorted = [...points].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+    const unique: Point2D[] = [];
+    for (const point of sorted) {
+        const prev = unique[unique.length - 1];
+        if (!prev || prev.x !== point.x || prev.y !== point.y) {
+            unique.push(point);
+        }
+    }
+    if (unique.length <= 2) {
+        return unique;
+    }
+
+    const lower: Point2D[] = [];
+    for (const point of unique) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+            lower.pop();
+        }
+        lower.push(point);
+    }
+    const upper: Point2D[] = [];
+    for (let i = unique.length - 1; i >= 0; i--) {
+        const point = unique[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+            upper.pop();
+        }
+        upper.push(point);
+    }
+    lower.pop();
+    upper.pop();
+    return [...lower, ...upper];
+}
+
+function cross(a: Point2D, b: Point2D, c: Point2D): number {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
 export default router;

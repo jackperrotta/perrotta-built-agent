@@ -1,9 +1,11 @@
 import { type Point } from '@construction/geometry';
 import { type RoomPlanJson } from '../../roomPlanTypes.js';
 import { type NormalizedScan } from '../models/constraints.js';
+import { extractEnvelopeFromWallSegments, type WallSegment2D } from './envelopeExtractor.js';
 
 export function normalizeScanGeometry(scan: RoomPlanJson, toleranceRatio: number): NormalizedScan {
-    const points = scan.walls.flatMap(extractWallEndpoints2D);
+    const wallSegmentsMeters = scan.walls.map(extractWallSegment2D);
+    const points = wallSegmentsMeters.flatMap((segment) => [segment.start, segment.end]);
     const notes: string[] = [];
 
     if (points.length < 2) {
@@ -37,10 +39,7 @@ export function normalizeScanGeometry(scan: RoomPlanJson, toleranceRatio: number
     const principalAngleRad = estimatePrincipalAxisAngle(points);
     const rotatedPoints = points.map((p) => rotatePoint(p, -principalAngleRad));
     const orientedBounds = getBounds(rotatedPoints);
-    const orientedPointsFt = rotatedPoints.map((point) => ({
-        x: metersToFeet(point.x),
-        y: metersToFeet(point.y)
-    }));
+    const orientedPointsFt = rotatedPoints.map((point) => ({ x: metersToFeet(point.x), y: metersToFeet(point.y) }));
     const orientedBoundsFt = getBounds(orientedPointsFt);
     const widthFt = Math.max(8, orientedBoundsFt.maxX - orientedBoundsFt.minX);
     const heightFt = Math.max(8, orientedBoundsFt.maxY - orientedBoundsFt.minY);
@@ -61,10 +60,27 @@ export function normalizeScanGeometry(scan: RoomPlanJson, toleranceRatio: number
         ? confidenceValues.reduce((acc, n) => acc + n, 0) / confidenceValues.length
         : 0.5;
 
-    const envelopePolygon = buildSteppedEnvelopePolygon(orientedPointsFt);
+    const orientedSegmentsFt: WallSegment2D[] = wallSegmentsMeters.map((segment) => {
+        const rotatedStart = rotatePoint(segment.start, -principalAngleRad);
+        const rotatedEnd = rotatePoint(segment.end, -principalAngleRad);
+        return {
+            sourceId: segment.sourceId,
+            start: { x: metersToFeet(rotatedStart.x), y: metersToFeet(rotatedStart.y) },
+            end: { x: metersToFeet(rotatedEnd.x), y: metersToFeet(rotatedEnd.y) }
+        };
+    });
+
+    const fallbackEnvelope = buildSteppedEnvelopePolygon(orientedPointsFt);
+    const extractedEnvelope = extractEnvelopeFromWallSegments(orientedSegmentsFt, fallbackEnvelope);
+    const envelopePolygon = shiftPolygonToOrigin(extractedEnvelope.polygon);
+    const envelopeBounds = getBounds(envelopePolygon);
 
     notes.push('Envelope derived from wall extents with tolerance band.');
-    notes.push('Envelope polygon derived from stepped horizontal profile (non-rectangular).');
+    notes.push(
+        extractedEnvelope.method === 'graph-loop'
+            ? 'Envelope polygon derived from snapped wall graph outer loop.'
+            : 'Envelope polygon derived from fallback stepped profile (graph extraction failed).'
+    );
     if (confidenceValues.length === 0) {
         notes.push('Wall confidence missing; defaulted to 0.5.');
     }
@@ -95,10 +111,11 @@ export function normalizeScanGeometry(scan: RoomPlanJson, toleranceRatio: number
             }
         },
         envelopeFt: {
-            widthFt: Math.max(8, getBounds(envelopePolygon).maxX - getBounds(envelopePolygon).minX),
-            heightFt: Math.max(8, getBounds(envelopePolygon).maxY - getBounds(envelopePolygon).minY),
+            widthFt: Math.max(8, envelopeBounds.maxX - envelopeBounds.minX),
+            heightFt: Math.max(8, envelopeBounds.maxY - envelopeBounds.minY),
             toleranceFt
         },
+        envelopeExtraction: extractedEnvelope.stats,
         scanWallStats: {
             wallCount: scan.walls.length,
             maxWallLengthFt
@@ -111,15 +128,15 @@ export function normalizeScanGeometry(scan: RoomPlanJson, toleranceRatio: number
         envelope: {
             polygon: envelopePolygon,
             toleranceFt,
-            widthFt: Math.max(8, getBounds(envelopePolygon).maxX - getBounds(envelopePolygon).minX),
-            heightFt: Math.max(8, getBounds(envelopePolygon).maxY - getBounds(envelopePolygon).minY),
+            widthFt: Math.max(8, envelopeBounds.maxX - envelopeBounds.minX),
+            heightFt: Math.max(8, envelopeBounds.maxY - envelopeBounds.minY),
             confidence
         },
         notes
     };
 }
 
-function extractWallEndpoints2D(wall: { dimensions: number[]; transform: number[] }): Point[] {
+function extractWallSegment2D(wall: { id?: string; dimensions: number[]; transform: number[] }): WallSegment2D {
     const width = wall.dimensions[0] ?? 0;
     const halfLen = width / 2;
     const mat = wall.transform;
@@ -131,10 +148,11 @@ function extractWallEndpoints2D(wall: { dimensions: number[]; transform: number[
     const rx = rawRx / directionLength;
     const rz = rawRz / directionLength;
 
-    return [
-        { x: tx - halfLen * rx, y: tz - halfLen * rz },
-        { x: tx + halfLen * rx, y: tz + halfLen * rz }
-    ];
+    return {
+        sourceId: wall.id ?? 'unknown-wall',
+        start: { x: tx - halfLen * rx, y: tz - halfLen * rz },
+        end: { x: tx + halfLen * rx, y: tz + halfLen * rz }
+    };
 }
 
 function metersToFeet(value: number): number {
@@ -308,4 +326,15 @@ function clampBandToBandDelta(values: number[], maxDelta: number): void {
             values[i] = values[i - 1] + Math.sign(delta) * maxDelta;
         }
     }
+}
+
+function shiftPolygonToOrigin(points: Point[]): Point[] {
+    if (points.length === 0) {
+        return points;
+    }
+    const bounds = getBounds(points);
+    return points.map((point) => ({
+        x: point.x - bounds.minX,
+        y: point.y - bounds.minY
+    }));
 }

@@ -413,9 +413,17 @@
             const defaults = result.assumptionsAndDefaults || {};
             const candidates = Array.isArray(result.rankedCandidates) ? result.rankedCandidates : [];
             const modelSpace = result?.rawDiagnosticMetadata?.modelSpaceFromEngine || result?.metadata?.modelSpace || null;
-            const envelopePolygon = Array.isArray(result?.rawDiagnosticMetadata?.envelopePolygonFromEngine)
+            const exteriorPreview = result?.rawDiagnosticMetadata?.exteriorEnvelopePreview || null;
+            const envelopePolygonFromExteriorPreview = Array.isArray(exteriorPreview?.envelopePolygon)
+                ? exteriorPreview.envelopePolygon
+                : [];
+            const envelopePolygonFromEngine = Array.isArray(result?.rawDiagnosticMetadata?.envelopePolygonFromEngine)
                 ? result.rawDiagnosticMetadata.envelopePolygonFromEngine
                 : [];
+            const envelopePolygon = envelopePolygonFromExteriorPreview.length >= 3
+                ? envelopePolygonFromExteriorPreview
+                : envelopePolygonFromEngine;
+            const exteriorWalls = Array.isArray(exteriorPreview?.exteriorWalls) ? exteriorPreview.exteriorWalls : [];
             const scanStats = result?.rawDiagnosticMetadata?.scanGeometryStats || null;
 
             const summaryHtml = `
@@ -452,6 +460,19 @@
                             <li>Top-5 wall lengths: ${(Array.isArray(scanStats.wallLengthsFtTop5) ? scanStats.wallLengthsFtTop5 : []).map(v => `${Number(v).toFixed(2)} ft`).join(', ') || 'n/a'}</li>
                         </ul>
                     ` : ''}
+                </div>
+            `;
+
+            const envelopeOnlyHtml = `
+                <div class="debug-block">
+                    <h4>Envelope-Only Preview (No Rooms)</h4>
+                    <p><strong>Preview source:</strong> ${envelopePolygonFromExteriorPreview.length >= 3
+                    ? `outside-most exterior walls (${escapeHtml(exteriorPreview?.selectionMethod || 'unknown')})`
+                    : 'engine envelope polygon'}</p>
+                    ${Array.isArray(envelopePolygon) && envelopePolygon.length >= 3
+                    ? renderEnvelopeOnlySvg(envelopePolygon, exteriorWalls)
+                    : '<p>Envelope polygon is unavailable for this run.</p>'}
+                    <div class="json-raw">${escapeHtml(JSON.stringify(envelopePolygon, null, 2))}</div>
                 </div>
             `;
 
@@ -502,7 +523,7 @@
                 </div>
             `;
 
-            layoutDebugOutput.innerHTML = `${summaryHtml}${modelSpaceHtml}${assumptionsHtml}${candidateHtml}${rawHtml}`;
+            layoutDebugOutput.innerHTML = `${summaryHtml}${modelSpaceHtml}${envelopeOnlyHtml}${assumptionsHtml}${candidateHtml}${rawHtml}`;
         }
 
         function renderCandidateLayoutSvg(candidate, envelopePolygon) {
@@ -577,6 +598,39 @@
                 <svg class="layout-preview-svg" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
                     ${envelopePath}
                     ${roomPaths}
+                </svg>
+            `;
+        }
+
+        function renderEnvelopeOnlySvg(envelopePolygon, exteriorWalls) {
+            const points = Array.isArray(envelopePolygon) ? envelopePolygon : [];
+            if (points.length < 3) {
+                return '<p>Envelope polygon is empty.</p>';
+            }
+
+            const xs = points.map(p => p.x);
+            const ys = points.map(p => p.y);
+            const minX = Math.min(...xs);
+            const minY = Math.min(...ys);
+            const maxX = Math.max(...xs);
+            const maxY = Math.max(...ys);
+            const width = Math.max(1, maxX - minX);
+            const height = Math.max(1, maxY - minY);
+            const area = polygonArea(points);
+            const pad = 2;
+            const viewBox = `${minX - pad} ${minY - pad} ${width + pad * 2} ${height + pad * 2}`;
+            const path = points.map(p => `${p.x},${p.y}`).join(' ');
+            const walls = Array.isArray(exteriorWalls) ? exteriorWalls : [];
+            const wallLines = walls.map((wall) => {
+                if (!wall?.start || !wall?.end) return '';
+                return `<line x1="${wall.start.x}" y1="${wall.start.y}" x2="${wall.end.x}" y2="${wall.end.y}" stroke="#d90429" stroke-width="0.45"></line>`;
+            }).join('');
+
+            return `
+                <p><strong>Envelope bounds:</strong> ${width.toFixed(2)} ft x ${height.toFixed(2)} ft | <strong>Area:</strong> ${area.toFixed(2)} sq ft${walls.length ? ` | <strong>Exterior walls:</strong> ${walls.length}` : ''}</p>
+                <svg class="layout-preview-svg" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                    <polygon points="${path}" fill="#d8dee9" fill-opacity="0.35" stroke="#111" stroke-width="0.8" stroke-dasharray="1.5 1.5"></polygon>
+                    ${wallLines}
                 </svg>
             `;
         }
