@@ -113,7 +113,7 @@ router.post('/', verifyToken, async (req: AuthenticatedRequest, res: Response) =
 
         const projectId = body.id || crypto.randomUUID();
         const project = buildProject(body, projectId);
-        await projectsCollection.doc(projectId).set(removeUndefined(project));
+        await projectsCollection.doc(projectId).set(removeUndefined(project as unknown as Record<string, unknown>));
         res.json({ status: 'success', project });
     } catch (error) {
         console.error('Error creating project:', error);

@@ -3,10 +3,12 @@
     "version": "0.0.1",
     "private": true,
     "scripts": {
-        "start": "node server.js"
+        "start": "node server.js",
+        "dev": "vite"
     },
     "devDependencies": {
         "@needle-tools/usd": "^0.0.1-61ded11",
-        "three": "^0.164.1"
+        "three": "^0.164.1",
+        "vite": "^7.3.1"
     }
 }

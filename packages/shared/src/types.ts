@@ -324,3 +324,111 @@ export interface Receipt {
     processedAt?: number;
     errorMessage?: string;
 }
+
+// --- Project Management (Phase 2) ---
+
+export type TaskStatus = 'todo' | 'scheduled' | 'in_progress' | 'review_pending' | 'completed' | 'blocked';
+export type WorkOrderStatus = 'draft' | 'sent' | 'approved' | 'paid';
+export type FieldLogType = 'daily_report' | 'issue' | 'progress_update' | 'change_order_request';
+export type UserRole = 'gc_admin' | 'subcontractor' | 'laborer' | 'client';
+
+export interface Phase {
+    id: string;
+    projectId: string;
+    name: string; // "Foundation", "Framing"
+    orderIndex: number;
+    startDate?: number;
+    endDate?: number;
+}
+
+export interface Task {
+    id: string;
+    projectId: string;
+    phaseId?: string;
+    title: string;
+    description?: string;
+    status: TaskStatus;
+    assignedTo?: string; // UserId
+
+    // Scheduling
+    startDate?: number;
+    endDate?: number;
+    actualStartDate?: number;
+    actualCompletedDate?: number;
+
+    // Dependencies (Gantt)
+    dependencyIds?: string[]; // TaskIds that must finish before this starts
+
+    // Financials
+    workOrderId?: string;
+
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface WorkOrder {
+    id: string;
+    projectId: string;
+    subcontractorId: string; // UserId
+    status: WorkOrderStatus;
+    taskIds: string[]; // The scope of this contract
+
+    totalAmount: number;
+    currency: string;
+
+    // Simple line items for the contract itself (optional detail)
+    lineItems?: {
+        description: string;
+        amount: number;
+    }[];
+
+    paymentIds?: string[];
+
+    createdAt: number;
+    updatedAt: number;
+    signedBy?: string;
+    signedAt?: number;
+}
+
+export interface FieldLog {
+    id: string;
+    projectId: string;
+    taskId?: string; // Optional link to specific task
+    authorId: string;
+    type: FieldLogType;
+
+    date: number; // Timestamp of the log date (noon that day)
+    content: string; // The text note or transcription
+    photos?: string[];
+
+    // Metadata
+    location?: {
+        latitude: number;
+        longitude: number;
+    };
+    weatherSnapshot?: string; // "Sunny, 75F"
+
+    sentiment?: 'positive' | 'neutral' | 'negative';
+    flaggedIssues?: string[];
+    taskUpdates?: {
+        taskId: string;
+        status: TaskStatus;
+        notes?: string;
+    }[];
+
+    createdAt: number;
+}
+
+export interface ProjectTeamMember {
+    userId: string;
+    role: UserRole;
+    permissions?: string[]; // "view_financials", "edit_schedule"
+}
+
+// Extension to the existing Project interface
+// Note: We don't modify the original 'Project' interface directly here 
+// to avoid breaking changes, but valid PM Projects will expect these fields.
+export interface PMProjectMetadata {
+    team?: ProjectTeamMember[];
+    budgetTotal?: number;
+}

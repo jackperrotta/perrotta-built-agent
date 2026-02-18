@@ -21,6 +21,7 @@ import adminRouter from './routes/admin.js';
 import accountingRouter from './routes/accounting.js';
 import projectsRouter from './routes/projects.js';
 import layoutsRouter from './routes/layouts.js';
+import { pmRouter } from './pm/routes/pm.router.js';
 
 app.use('/api/docs', docsRouter);
 app.use('/api/sessions', sessionsRouter);
@@ -29,6 +30,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/accounting', accountingRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/layouts', layoutsRouter);
+app.use('/api/pm', pmRouter);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

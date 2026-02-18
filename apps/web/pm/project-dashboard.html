@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Dashboard - Perrotta Built</title>
+    <link rel="stylesheet" href="../src/styles/main.css"> <!-- Assuming global styles -->
+    <script type="module" src="../src/components/gantt-chart.js"></script>
+    <script type="module" src="../src/components/field-feed.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f3f4f6; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #fff; padding: 1rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; font-size: 1.25rem; }
+        .tabs { display: flex; gap: 1rem; margin-top: 1rem; }
+        .tab-btn { padding: 0.5rem 1rem; border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-btn.active { border-bottom-color: #2563eb; color: #2563eb; font-weight: 600; }
+        
+        main { flex: 1; display: grid; grid-template-columns: 1fr 350px; gap: 1rem; padding: 1rem; overflow: hidden; }
+        .main-view { background: #fff; border-radius: 0.5rem; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; }
+        .side-panel { background: #fff; border-radius: 0.5rem; border: 1px solid #e5e7eb; overflow: hidden; display: flex; flex-direction: column; }
+        
+        gantt-chart { flex: 1; overflow: auto; }
+        field-feed { flex: 1; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1 id="project-title">Loading Project...</h1>
+            <div class="tabs">
+                <button class="tab-btn active">Schedule</button>
+                <button class="tab-btn">Financials</button>
+                <button class="tab-btn">Team</button>
+            </div>
+        </div>
+        <div class="user-profile">
+            <!-- User avatar placeholder -->
+            <div style="width:32px;height:32px;background:#ddd;border-radius:50%;"></div>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-view">
+            <gantt-chart></gantt-chart>
+        </div>
+        <aside class="side-panel">
+            <field-feed></field-feed>
+        </aside>
+    </main>
+
+    <script type="module">
+        import { projectStore } from '../src/stores/project-store.js';
+        import { pmApi } from '../src/services/pm-api.js';
+
+        // Parse Project ID from URL
+        const params = new URLSearchParams(window.location.search);
+        const projectId = params.get('id');
+
+        if (!projectId) {
+            alert('No Project ID provided in URL');
+            // In real app, redirect to project list
+        } else {
+            // Initialize Store
+            projectStore.loadProjectData(projectId);
+            
+            // Also fetch project details for header
+            pmApi.getProject(projectId).then(project => {
+                document.getElementById('project-title').textContent = project.name || 'Untitled Project';
+            }).catch(err => {
+                console.error('Failed to load project details', err);
+                document.getElementById('project-title').textContent = 'Project Not Found';
+            });
+        }
+    </script>
+</body>
+</html>

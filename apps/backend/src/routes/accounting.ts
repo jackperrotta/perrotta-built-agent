@@ -4,12 +4,13 @@ import { db, storage } from '../config/firebase.js';
 import { verifyToken, type AuthenticatedRequest } from '../middleware/auth.js';
 import {
     type Account,
-    type JournalEntry,
-    type ProfitLossReport,
-    type BalanceSheetReport,
     type AccountingImport,
     type BankTransaction,
     type CategorizationRule,
+    type JournalEntry,
+    type JournalLine,
+    type ProfitLossReport,
+    type BalanceSheetReport,
     type Receipt,
     type ReceiptExtraction,
     type ReceiptLineItem
@@ -468,7 +469,7 @@ const findMatchingTransaction = async (amount?: number, date?: number) => {
     const snapshot = await transactionsCollection.orderBy('date', 'desc').get();
     const transactions = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as BankTransaction);
     const targetDate = date as number;
-    const candidates = transactions.filter(txn => {
+    const candidates = transactions.filter((txn: BankTransaction) => {
         const amountMatch = Math.round(Math.abs(txn.amount) * 100) === Math.round(Math.abs(amount as number) * 100);
         const dateDiff = Math.abs(txn.date - targetDate);
         return amountMatch && dateDiff <= 1000 * 60 * 60 * 24 * 2;
@@ -514,7 +515,7 @@ const validateJournalEntry = (entry: JournalEntry) => {
 const fetchAccountsMap = async () => {
     const snapshot = await accountsCollection.orderBy('code', 'asc').get();
     const accounts = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Account);
-    return new Map(accounts.map(account => [account.id, account]));
+    return new Map<string, Account>(accounts.map((account: Account) => [account.id, account]));
 };
 
 const fetchJournalEntries = async () => {
@@ -757,13 +758,13 @@ router.get('/journal-entries', verifyToken, async (req: AuthenticatedRequest, re
         const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
 
         const entries = await fetchJournalEntries();
-        const filtered = entries.filter(entry => {
+        const filtered = entries.filter((entry: JournalEntry) => {
             const inRange =
                 (!Number.isFinite(dateFrom) || entry.date >= dateFrom) &&
                 (!Number.isFinite(dateTo) || entry.date <= dateTo);
             if (!inRange) return false;
             if (!projectId) return true;
-            return entry.lines.some(line => line.projectId === projectId);
+            return entry.lines.some((line: JournalLine) => line.projectId === projectId);
         });
 
         res.json(filtered);
@@ -878,7 +879,7 @@ router.post('/imports/:id/process', verifyToken, async (req: AuthenticatedReques
 
         for (const row of rows) {
             const transactionId = crypto.randomUUID();
-            const matchedRule = rules.find(rule => rule.isActive && row.description.toLowerCase().includes(rule.matchText.toLowerCase()));
+            const matchedRule = rules.find((rule: CategorizationRule) => rule.isActive && row.description.toLowerCase().includes(rule.matchText.toLowerCase()));
             const status: BankTransaction['status'] = matchedRule ? 'categorized' : 'uncategorized';
             const transaction: BankTransaction = {
                 id: transactionId,
@@ -943,10 +944,10 @@ router.get('/transactions', verifyToken, async (req: AuthenticatedRequest, res: 
         const snapshot = await transactionsCollection.orderBy('date', 'desc').get();
         let transactions = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as BankTransaction);
         if (status) {
-            transactions = transactions.filter(txn => txn.status === status);
+            transactions = transactions.filter((txn: BankTransaction) => txn.status === status);
         }
         if (importId) {
-            transactions = transactions.filter(txn => txn.importId === importId);
+            transactions = transactions.filter((txn: BankTransaction) => txn.importId === importId);
         }
         res.json(transactions);
     } catch (error) {
@@ -1055,7 +1056,7 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
             updatedAt: now
         };
 
-        await receiptsCollection.doc(receiptId).set(stripUndefined(record as Record<string, unknown>));
+        await receiptsCollection.doc(receiptId).set(stripUndefined(record as unknown as Record<string, unknown>));
 
         void enrichReceiptAsync(receiptId, {
             rawOcrText: details.rawOcrText,
@@ -1282,7 +1283,7 @@ router.post('/receipts/enrich', verifyToken, async (req: AuthenticatedRequest, r
         const snapshot = await receiptsCollection.orderBy('createdAt', 'desc').get();
         let receipts = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Receipt);
         if (body.status) {
-            receipts = receipts.filter(receipt => receipt.status === body.status);
+            receipts = receipts.filter((receipt: Receipt) => receipt.status === body.status);
         }
 
         const targetReceipts = receipts.slice(0, limit);

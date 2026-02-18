@@ -140,16 +140,16 @@ router.post('/scans/:scanSessionId/layout-debug', verifyToken, async (req: Authe
                 projectId: session.projectId ?? null,
                 stairwayCount: Array.isArray(session.stairways) ? session.stairways.length : 0,
                 segmentCount: Array.isArray(session.segments) ? session.segments.length : 0,
-                orientation: (session as Record<string, unknown>).orientation ?? null,
-                height: (session as Record<string, unknown>).height ?? null,
-                floors: (session as Record<string, unknown>).floors ?? null
+                orientation: (session as unknown as Record<string, unknown>).orientation ?? null,
+                height: (session as unknown as Record<string, unknown>).height ?? null,
+                floors: (session as unknown as Record<string, unknown>).floors ?? null
             },
             segmentMetadata: {
                 startTime: segment.startTime ?? null,
                 endTime: segment.endTime ?? null,
-                story: (segment as Record<string, unknown>).story ?? null,
-                orientation: (segment as Record<string, unknown>).orientation ?? null,
-                height: (segment as Record<string, unknown>).height ?? null
+                story: (segment as unknown as Record<string, unknown>).story ?? null,
+                width: (segment as unknown as Record<string, unknown>).width ?? null,
+                height: (segment as unknown as Record<string, unknown>).height ?? null
             },
             geometrySource: segment.roomPlanJSONRemoteURL,
             modelSpaceFromEngine: (generated.metadata as unknown as { modelSpace?: unknown }).modelSpace ?? null,
