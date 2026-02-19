@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build --workspace=@perrotta-built/website && npm run build:local",
     "build:local": "tsc -b",
     "clean": "rm -rf dist node_modules **/*/node_modules **/*/dist",
     "start": "npx tsx apps/backend/src/main.ts",

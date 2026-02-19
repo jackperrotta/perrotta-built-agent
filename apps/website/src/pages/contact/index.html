@@ -1,0 +1,64 @@
+<!-- title: Contact Us -->
+<!-- description: Get in touch with Perrotta Built for your next project. -->
+
+<section class="section bg-dark text-white text-center" style="padding: 6rem 0 4rem;">
+    <div class="container">
+        <h1>Contact Us</h1>
+        <p class="lead text-white">We'd love to hear about your project.</p>
+    </div>
+</section>
+
+<section class="section bg-white">
+    <div class="container grid-2">
+        <div class="content">
+            <h2>Get In Touch</h2>
+            <p>Whether you're looking to build, sell, or invest, our team is ready to help.</p>
+
+            <div style="margin-top: 2rem;">
+                <h3>Phone</h3>
+                <p><a href="tel:2155550123">(215) 555-0123</a></p>
+
+                <h3>Email</h3>
+                <p><a href="mailto:info@perrottabuilt.com">info@perrottabuilt.com</a></p>
+
+                <h3>Office</h3>
+                <p>123 Construction Ave<br>Philadelphia, PA 19100</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Send us a Message</h3>
+            <form action="#" method="POST" style="display: flex; flex-direction: column; gap: 1rem;">
+                <!-- Simple Form Shim -->
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Name</label>
+                    <input type="text" name="name"
+                        style="width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px;" required>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Email</label>
+                    <input type="email" name="email"
+                        style="width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px;" required>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Interest</label>
+                    <select name="interest"
+                        style="width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="renovation">Renovation / Construction</option>
+                        <option value="selling">Selling a Property</option>
+                        <option value="investing">Investing</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Message</label>
+                    <textarea name="message" rows="5"
+                        style="width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px;"
+                        required></textarea>
+                </div>
+                <button type="submit" class="btn-primary" style="border: none; cursor: pointer; font-size: 1rem;">Send
+                    Message</button>
+            </form>
+        </div>
+    </div>
+</section>

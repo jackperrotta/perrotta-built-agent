@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3000;
-const ROOT = path.resolve(__dirname);
+const ADMIN_ROOT = path.resolve(__dirname);
+const WEBSITE_ROOT = path.resolve(__dirname, '../website/public');
 
 // MIME types
 const MIMES = {
@@ -31,14 +32,29 @@ http.createServer((req, res) => {
         'Expires': '0',
     };
 
-    // Remove query string
-    let cleanUrl = req.url.split('?')[0];
-    if (cleanUrl === '/') cleanUrl = '/index.html';
+    let reqUrl = req.url.split('?')[0];
 
-    let filePath = path.join(ROOT, cleanUrl);
+    // Routing Logic
+    let filePath;
+    let serveRoot;
+
+    if (reqUrl.startsWith('/admin')) {
+        // serve from apps/web (Admin Dashboard)
+        let relativeUrl = reqUrl.substring(6); // remove '/admin'
+        if (relativeUrl === '' || relativeUrl === '/') relativeUrl = '/index.html';
+
+        serveRoot = ADMIN_ROOT;
+        filePath = path.join(ADMIN_ROOT, relativeUrl);
+    } else {
+        // serve from apps/website/public (Customer Website)
+        if (reqUrl === '/') reqUrl = '/index.html';
+
+        serveRoot = WEBSITE_ROOT;
+        filePath = path.join(WEBSITE_ROOT, reqUrl);
+    }
 
     // Safety check
-    if (!filePath.startsWith(ROOT)) {
+    if (!filePath.startsWith(serveRoot)) {
         res.writeHead(403, headers);
         res.end('Forbidden');
         return;
@@ -90,5 +106,7 @@ http.createServer((req, res) => {
 
 }).listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}/`);
+    console.log(`- Website: http://localhost:${PORT}/`);
+    console.log(`- Admin:   http://localhost:${PORT}/admin`);
     console.log(`Serving with COOP/COEP headers for WASM support.`);
 });
