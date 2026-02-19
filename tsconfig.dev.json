@@ -1,0 +1,22 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "paths": {
+            "@construction/shared": [
+                "./packages/shared/src/index.ts"
+            ],
+            "@construction/geometry": [
+                "./packages/geometry/src/index.ts"
+            ],
+            "@construction/audio": [
+                "./packages/audio/src/index.ts"
+            ],
+            "@construction/vision": [
+                "./packages/vision/src/index.ts"
+            ],
+            "@construction/layout": [
+                "./packages/layout/src/index.ts"
+            ]
+        }
+    }
+}

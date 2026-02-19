@@ -5,7 +5,7 @@
     "scripts": {
         "build": "tsc",
         "start": "node dist/main.js",
-        "dev": "tsx watch src/main.ts"
+        "dev": "tsx watch --tsconfig ../../tsconfig.dev.json src/main.ts"
     },
     "dependencies": {
         "@construction/shared": "*",
