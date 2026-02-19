@@ -134,6 +134,12 @@ export interface Project {
     startDate?: number;
     endDate?: number;
     scanSessionIds?: string[];
+    budget?: number; // Total approved budget in cents
+    performance?: {
+        scheduleVariance?: number; // Days ahead (+) or behind (-)
+        budgetVariance?: number; // Cents under (+) or over (-) budget
+        openChangeOrdersCount?: number;
+    };
     createdAt: number;
     updatedAt: number;
 }
@@ -323,4 +329,134 @@ export interface Receipt {
     updatedAt: number;
     processedAt?: number;
     errorMessage?: string;
+}
+
+// --- Project Management (Phase 2) ---
+
+export type TaskStatus = 'open' | 'assigned' | 'in_progress' | 'review' | 'completed';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface Task {
+    id: string;
+    projectId: string;
+    title: string;
+    description?: string;
+    status: TaskStatus;
+    priority: TaskPriority;
+    assigneeId?: string; // User ID or Subcontractor ID
+    startDate?: number;
+    dueDate?: number;
+    completedDate?: number;
+    dependencies?: string[]; // Array of Task IDs
+    costCode?: string;
+    estimatedHours?: number;
+    actualHours?: number;
+    laborCost?: number;
+    materialCost?: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export type ChangeOrderStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
+export interface ChangeOrder {
+    id: string;
+    projectId: string;
+    title: string;
+    description: string;
+    status: ChangeOrderStatus;
+    amount: number; // Financial impact in cents
+    scheduleImpactDays?: number; // Time impact in days
+    initiatorId?: string; // User ID who requested the change
+    approverId?: string; // User ID who can approve
+    scope?: 'task' | 'project';
+    relatedTaskIds?: string[];
+    approvedBy?: string; // User ID
+    approvedAt?: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export type EstimateStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
+export interface Estimate {
+    id: string;
+    projectId: string;
+    subcontractorId: string;
+    taskIds: string[]; // Can cover multiple tasks
+    status: EstimateStatus;
+    totalAmount: number; // in cents
+    details?: string; // Markdown or simple text description
+    expirationDate?: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export type TimeLogStatus = 'pending_approval' | 'approved' | 'rejected';
+
+export interface TimeLog {
+    id: string;
+    projectId: string;
+    userId: string;
+    taskId?: string; // Optional, can be general project time
+    startTime: number;
+    endTime?: number;
+    durationMinutes?: number; // Can be derived or manual
+    description?: string;
+    status: TimeLogStatus;
+    geoStart?: {
+        latitude: number;
+        longitude: number;
+    };
+    geoEnd?: {
+        latitude: number;
+        longitude: number;
+    };
+    createdAt: number;
+    updatedAt: number;
+}
+
+export type FieldLogType = 'daily_report' | 'safety' | 'observance' | 'progress';
+
+export interface FieldLogAsset {
+    id: string;
+    url: string;
+    type: 'image' | 'video' | 'audio';
+    tags?: string[];
+    createdAt: number;
+}
+
+export interface FieldLog {
+    id: string;
+    projectId: string;
+    taskId?: string;
+    authorId: string;
+    type: FieldLogType;
+    content: string; // Text content or structured data
+    assets?: FieldLogAsset[];
+    location?: {
+        latitude: number;
+        longitude: number;
+    };
+    weather?: {
+        summary: string;
+        temperature: number;
+        condition: string;
+    };
+    sentiment?: 'positive' | 'neutral' | 'negative' | 'alert'; // AI analyzed
+    createdAt: number; // Timestamp of the log
+}
+
+export type ProjectRole = 'manager' | 'subcontractor' | 'laborer' | 'client';
+
+export interface ProjectMember {
+    id: string; // Unique Member ID (not necessarily User ID, but could be linked)
+    projectId: string;
+    userId?: string; // Link to Registered User if applicable
+    displayName: string;
+    email?: string;
+    phone?: string;
+    role: ProjectRole;
+    permissions?: string[];
+    joinedAt: number;
 }

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Dashboard - Perrotta Built</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+        }
+
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+
+        .row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+
+        button.primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        button.secondary {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        button.danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        input,
+        select,
+        textarea {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Dashboard Specifics */
+        .project-selector {
+            margin-bottom: 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-weight: bold;
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .tab-btn.active {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: -2px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #007bff;
+            display: block;
+            margin-top: 0.5rem;
+        }
+
+        .task-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .task-item {
+            background: #fff;
+            border: 1px solid #eee;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .status-open {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .status-in_progress {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .feed-item {
+            border-left: 3px solid #007bff;
+            padding-left: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feed-meta {
+            font-size: 0.85rem;
+            color: #777;
+            margin-bottom: 0.5rem;
+        }
+
+        .feed-content {
+            background: #f8f9fa;
+            padding: 0.8rem;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div>
+            <h1>Project Dashboard</h1>
+            <a href="/admin/index.html">← Back to Admin</a>
+        </div>
+        <div id="user-info">Loading...</div>
+    </header>
+
+    <div class="project-selector card">
+        <label for="current-project"><strong>Select Project:</strong></label>
+        <select id="current-project" style="max-width: 400px; margin-top: 0.5rem;">
+            <option value="">Loading projects...</option>
+        </select>
+    </div>
+
+    <div id="dashboard-container" style="display: none;">
+        <div class="card">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="overview">Overview</button>
+                <button class="tab-btn" data-tab="tasks">Tasks</button>
+                <button class="tab-btn" data-tab="feed">Field Feed</button>
+                <button class="tab-btn" data-tab="financials">Financials</button>
+                <button class="tab-btn" data-tab="time">Time Sheets</button>
+                <button class="tab-btn" data-tab="members">Members</button>
+            </div>
+
+            <!-- OVERVIEW TAB -->
+            <div id="overview" class="tab-content active">
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Schedule Variance</span>
+                        <span id="stat-schedule" class="stat-val">--</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Budget Variance</span>
+                        <span id="stat-budget" class="stat-val">--</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Open Change Orders</span>
+                        <span id="stat-co" class="stat-val">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TASKS TAB -->
+            <div id="tasks" class="tab-content">
+                <div class="row" style="justify-content: space-between; align-items: center;">
+                    <h3>Tasks</h3>
+                    <button class="primary" id="add-task-btn">+ New Task</button>
+                </div>
+                <!-- Simple Task Form (Hidden by default) -->
+                <div id="task-form"
+                    style="display:none; background: #f8f9fa; padding: 1rem; margin-bottom: 1rem; border-radius: 6px;">
+                    <div class="row">
+                        <div class="col"><input id="new-task-title" placeholder="Task Title" /></div>
+                        <div class="col">
+                            <select id="new-task-assignee">
+                                <option value="">Assignee (Optional)</option>
+                            </select>
+                        </div>
+                        <div class="col"><button class="primary" id="save-task-btn">Save</button> <button
+                                class="secondary" id="cancel-task-btn">Cancel</button></div>
+                    </div>
+                </div>
+                <ul id="task-list" class="task-list">
+                    <li>Loading tasks...</li>
+                </ul>
+            </div>
+
+            <!-- FEED TAB -->
+            <div id="feed" class="tab-content">
+                <h3>Field Activity</h3>
+                <div id="activity-feed">
+                    <p>No recent field activity.</p>
+                </div>
+            </div>
+
+            <!-- FINANCIALS TAB -->
+            <div id="financials" class="tab-content">
+                <h3>Estimates</h3>
+                <div id="estimates-list">Loading...</div>
+
+                <h3 style="margin-top: 2rem;">Change Orders</h3>
+                <button class="primary" id="add-co-btn" style="float: right; margin-top: -30px;">+ New Change
+                    Order</button>
+                <div id="co-list">Loading...</div>
+            </div>
+
+            <!-- TIME TAB -->
+            <div id="time" class="tab-content">
+                <div class="row" style="justify-content: space-between; align-items: center;">
+                    <h3>Time Sheets</h3>
+                    <div>
+                        <button class="primary" id="clock-in-btn">Clock In</button>
+                        <button class="danger" id="clock-out-btn" style="display:none;">Clock Out</button>
+                    </div>
+                </div>
+                <div id="time-logs-list">Loading...</div>
+            </div>
+
+            <!-- MEMBERS TAB -->
+            <div id="members" class="tab-content">
+                <h3>Project Team</h3>
+                <p>Team management coming soon...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { onAuthChange, getToken } from '../src/auth.js';
+        import { getProjects } from '../src/services/projectService.js';
+        import { projectStore } from '../src/services/project-store.js';
+
+        const projectSelect = document.getElementById('current-project');
+        const container = document.getElementById('dashboard-container');
+
+        // Tab Switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        onAuthChange(async (user) => {
+            if (!user) {
+                window.location.href = '/admin/login.html';
+                return;
+            }
+            document.getElementById('user-info').textContent = user.email;
+            await init();
+        });
+
+        async function init() {
+            try {
+                const projects = await getProjects();
+                projectSelect.innerHTML = '<option value="">Select a project...</option>';
+                projects.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    projectSelect.appendChild(opt);
+                });
+
+                projectSelect.addEventListener('change', async (e) => {
+                    const pid = e.target.value;
+                    if (pid) {
+                        container.style.display = 'block';
+                        await loadProjectData(pid);
+                    } else {
+                        container.style.display = 'none';
+                    }
+                });
+            } catch (e) {
+                console.error(e);
+                alert('Failed to load projects');
+            }
+        }
+
+        async function loadProjectData(projectId) {
+            // Subscribe to store updates
+            projectStore.subscribe(() => render(projectId));
+
+            // Initial Load
+            await projectStore.loadProject(projectId);
+        }
+
+        function render(projectId) {
+            renderOverview(projectId);
+            renderTasks(projectId);
+            renderFeed(projectId);
+            renderFinancials(projectId);
+            renderTime(projectId);
+        }
+
+        // ... existing render functions ...
+
+        function renderFinancials(projectId) {
+            const estimates = projectStore.getProjectEstimates(projectId);
+            const coList = projectStore.getProjectChangeOrders(projectId);
+
+            // Render Estimates
+            const estContainer = document.getElementById('estimates-list');
+            if (estimates.length === 0) {
+                estContainer.innerHTML = '<p>No estimates found.</p>';
+            } else {
+                estContainer.innerHTML = `
+                    <table style="width:100%; border-collapse: collapse;">
+                        <thead><tr style="background:#f8f9fa;"><th style="padding:8px;">Subcontractor</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+                        <tbody>${estimates.map(e => `
+                            <tr>
+                                <td style="padding:8px;">${e.subcontractorId}</td>
+                                <td>$${(e.totalAmount / 100).toFixed(2)}</td>
+                                <td><span class="task-status">${e.status}</span></td>
+                                <td>${new Date(e.createdAt).toLocaleDateString()}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>
+                `;
+            }
+
+            // Render Change Orders
+            const coContainer = document.getElementById('co-list');
+            if (coList.length === 0) {
+                coContainer.innerHTML = '<p>No change orders found.</p>';
+            } else {
+                coContainer.innerHTML = `
+                   <table style="width:100%; border-collapse: collapse;">
+                        <thead><tr style="background:#f8f9fa;"><th style="padding:8px;">Title</th><th>Amount</th><th>Status</th><th>Initiator</th></tr></thead>
+                        <tbody>${coList.map(co => `
+                            <tr>
+                                <td style="padding:8px;">${co.title}</td>
+                                <td>$${(co.amount / 100).toFixed(2)}</td>
+                                <td><span class="task-status">${co.status}</span></td>
+                                <td>${co.initiatorId}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table> 
+                `;
+            }
+        }
+
+        function renderTime(projectId) {
+            const logs = projectStore.getProjectTimeLogs(projectId);
+            const container = document.getElementById('time-logs-list');
+
+            if (logs.length === 0) {
+                container.innerHTML = '<p>No time logs found.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead><tr style="background:#f8f9fa;"><th style="padding:8px;">User</th><th>Start</th><th>End</th><th>Duration</th><th>Status</th></tr></thead>
+                    <tbody>${logs.map(log => `
+                        <tr>
+                            <td style="padding:8px;">${log.userId}</td>
+                            <td>${new Date(log.startTime).toLocaleString()}</td>
+                            <td>${log.endTime ? new Date(log.endTime).toLocaleString() : 'Active'}</td>
+                            <td>${log.durationMinutes ? log.durationMinutes + 'm' : '--'}</td>
+                            <td>${log.status}</td>
+                        </tr>
+                    `).join('')}</tbody>
+                </table>
+            `;
+        }
+
+        // Clock In/Out Mock Logic
+        document.getElementById('clock-in-btn').addEventListener('click', async () => {
+            const projectId = projectSelect.value;
+            if (!projectId) return;
+            try {
+                await projectStore.request('/api/time-logs', {
+                    method: 'POST',
+                    body: JSON.stringify({ projectId, startTime: Date.now() })
+                });
+                alert('Clocked In!');
+                await projectStore.loadTimeLogs(projectId); // Reload to show new log
+            } catch (e) { alert(e.message); }
+        });
+
+        function renderOverview(projectId) {
+            const perf = projectStore.getProjectPerformance(projectId);
+            if (!perf) return;
+
+            document.getElementById('stat-schedule').textContent = `${perf.scheduleVariance > 0 ? '+' :
+                ''}${perf.scheduleVariance} Days`;
+            document.getElementById('stat-schedule').style.color = perf.scheduleVariance >= 0 ? '#065f46' : '#b91c1c';
+
+            const budgetVar = (perf.budgetVariance / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            document.getElementById('stat-budget').textContent = budgetVar;
+            document.getElementById('stat-budget').style.color = perf.budgetVariance >= 0 ? '#065f46' : '#b91c1c';
+
+            document.getElementById('stat-co').textContent = perf.openChangeOrdersCount;
+        }
+
+        function renderTasks(projectId) {
+            const tasks = projectStore.getProjectTasks(projectId);
+            const listFn = document.getElementById('task-list');
+
+            if (tasks.length === 0) {
+                listFn.innerHTML = '<li>No tasks found.</li>';
+                return;
+            }
+
+            listFn.innerHTML = tasks.map(t => `
+    <li class="task-item">
+        <div>
+            <strong>${t.title}</strong>
+            <div style="font-size: 0.85rem; color: #666;">${t.description || ''}</div>
+        </div>
+        <div>
+            <span class="task-status status-${t.status}">${t.status.replace('_', ' ')}</span>
+        </div>
+    </li>
+    `).join('');
+        }
+
+        // Task Creation Logic
+        const taskForm = document.getElementById('task-form');
+        document.getElementById('add-task-btn').addEventListener('click', () => {
+            taskForm.style.display = 'block';
+        });
+        document.getElementById('cancel-task-btn').addEventListener('click', () => {
+            taskForm.style.display = 'none';
+        });
+
+        document.getElementById('save-task-btn').addEventListener('click', async () => {
+            const title = document.getElementById('new-task-title').value;
+            const projectId = projectSelect.value;
+            if (!title || !projectId) return;
+
+            try {
+                await projectStore.createTask(projectId, {
+                    title,
+                    status: 'open',
+                    priority: 'medium'
+                });
+                taskForm.style.display = 'none';
+                document.getElementById('new-task-title').value = '';
+            } catch (e) {
+                alert(e.message);
+            }
+        });
+
+        function renderFeed(projectId) {
+            const logs = projectStore.getProjectLogs(projectId);
+            const feedContainer = document.getElementById('activity-feed');
+
+            if (logs.length === 0) {
+                feedContainer.innerHTML = '<p>No recent field activity.</p>';
+                return;
+            }
+
+            feedContainer.innerHTML = logs.map(log => {
+                const date = new Date(log.createdAt).toLocaleString();
+                let assetsHtml = '';
+                if (log.assets && log.assets.length > 0) {
+                    assetsHtml = `<div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">${log.assets.map(a => {
+                        if (a.type === 'image') return `<img src="${a.url}" style="height: 60px; border-radius: 4px;" />`;
+                        return `<span>[${a.type}]</span>`;
+                    }).join('')
+                        }</div>`;
+                }
+
+                return `
+    <div class="feed-item">
+        <div class="feed-meta">
+            <strong>${log.type.toUpperCase()}</strong> • ${date}
+        </div>
+        <div class="feed-content">
+            ${log.content}
+            ${assetsHtml}
+        </div>
+    </div>
+    `;
+            }).join('');
+        }
+    </script>
+</body>
+
+</html>

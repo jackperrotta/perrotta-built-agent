@@ -20,6 +20,11 @@ import docsRouter from './routes/docs.js';
 import adminRouter from './routes/admin.js';
 import accountingRouter from './routes/accounting.js';
 import projectsRouter from './routes/projects.js';
+import tasksRouter from './routes/tasks.js';
+import fieldRouter from './routes/field.js';
+import estimatesRouter from './routes/estimates.js';
+import timeLogsRouter from './routes/time-logs.js';
+import changeOrdersRouter from './routes/change-orders.js';
 
 app.use('/api/docs', docsRouter);
 app.use('/api/sessions', sessionsRouter);
@@ -27,7 +32,11 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/accounting', accountingRouter);
 app.use('/api/projects', projectsRouter);
-
+app.use('/api/tasks', tasksRouter);
+app.use('/api/field', fieldRouter);
+app.use('/api/estimates', estimatesRouter);
+app.use('/api/time-logs', timeLogsRouter);
+app.use('/api/change-orders', changeOrdersRouter);
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
