@@ -46,7 +46,8 @@ The repository is organized as an npm workspace:
 ```
 ├── apps
 │   ├── backend     # The core API service (HTTP, Auth, Business Logic)
-│   └── web         # Admin/User Dashboard (Vanilla JS + ES Modules)
+│   ├── web         # Admin/User Dashboard (Vanilla JS + ES Modules)
+│   └── website     # Public Marketing Site (Custom Static Site Generator)
 └── packages
     ├── shared      # Source of Truth: Typed interfaces shared across apps
     ├── geometry    # 🚧 (Future) 3D processing & spatial math
@@ -54,6 +55,18 @@ The repository is organized as an npm workspace:
     ├── audio       # 🚧 (Future) Voice note transcription pipeline
     └── layout      # 🚧 (Future) Floorplan generation engine
 ```
+
+## 🌐 Public Website (@perrotta-built/website)
+A high-performance, customer-facing marketing site built with a **custom Static Site Generator (SSG)**.
+
+-   **Architecture**: Native HTML/CSS/JS with a custom build script (`scripts/build.js`).
+-   **SSG Features**: 
+    -   Component Injection (`<c-navbar>`, `<c-footer>`, etc.).
+    -   Asset Bundling (Combines CSS/JS into single efficient files).
+    -   Dynamic Routing (Generates Blog pages from `mock-db.js`).
+-   **Serving**:
+    -   **Development**: Served at `http://localhost:3000/`.
+    -   **Integration**: The Admin Dashboard (`apps/web`) is served at `http://localhost:3000/admin`.
 
 ## ✅ Completed Features
 

@@ -45,7 +45,7 @@ const normalizeLineItems = (items?: unknown): ReceiptLineItem[] | undefined => {
 };
 
 const mergeIfMissing = <T extends Record<string, unknown>>(target: T, source: T) => {
-    const result = { ...target };
+    const result = { ...target } as any;
     Object.entries(source).forEach(([key, value]) => {
         if (result[key] === undefined && value !== undefined) {
             result[key] = value;
@@ -233,7 +233,7 @@ export const enrichReceiptAsync = async (receiptId: string, input: EnrichmentInp
             parsedSource: existing.parsedSource ?? 'openai',
             processingVersion: existing.processingVersion ?? 'ai-v1',
             updatedAt: Date.now()
-        }), existing as Record<string, unknown>);
+        }), existing as unknown as Record<string, unknown>);
 
         await docRef.update(updatePayload);
 

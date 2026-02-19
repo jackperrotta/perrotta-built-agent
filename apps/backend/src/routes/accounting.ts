@@ -12,10 +12,31 @@ import {
     type CategorizationRule,
     type Receipt,
     type ReceiptExtraction,
-    type ReceiptLineItem
+    type ReceiptLineItem,
+    type CategorizationRule as Rule
 } from '@construction/shared';
+
+type RuleCondition = {
+    field: string;
+    operator: 'includes' | 'equals' | 'greaterThan' | 'lessThan';
+    value: string | number;
+};
+
+type CategoryStat = {
+    id: string;
+    name: string;
+    type: string;
+    actual?: number;
+    budget?: number;
+    difference?: number;
+    total?: number;
+};
+
 import { generateSignedUploadUrl } from '../services/storage.js';
 import { enrichReceiptAsync } from '../services/receiptEnrichment.js';
+
+type JournalEntryLine = JournalEntry['lines'][number];
+type AccountType = Account['type'];
 
 const router = Router();
 const accountsCollection = db.collection('accounts');
@@ -29,7 +50,7 @@ const merchantsCollection = db.collection('merchants');
 const DEFAULT_CURRENCY = 'USD';
 const DEFAULT_BANK_ACCOUNT_ID = '1010';
 
-type DefaultAccount = Pick<Account, 'id' | 'code' | 'name' | 'type' | 'subType' | 'parentId' | 'description'>;
+type DefaultAccount = Pick<Account, 'id' | 'code' | 'name' | 'type' | 'subType'> & Partial<Pick<Account, 'parentId' | 'description'>>;
 
 const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
     { id: '1000', code: '1000', name: 'Cash', type: 'asset', subType: 'current_asset' },
@@ -219,98 +240,14 @@ const fetchRules = async () => {
     return snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as CategorizationRule);
 };
 
-const createJournalEntryForTransaction = async (
-    transaction: BankTransaction,
-    bankAccountId: string,
-    accountId: string,
-    createdBy: string
-) => {
-    const now = Date.now();
-    const entryId = crypto.randomUUID();
-    const amount = Math.abs(transaction.amount);
-    const isInflow = transaction.amount > 0;
-
-    const lines = isInflow
-        ? [
-            { accountId: bankAccountId, debit: amount, credit: 0, projectId: transaction.projectId },
-            { accountId, debit: 0, credit: amount, projectId: transaction.projectId }
-        ]
-        : [
-            { accountId, debit: amount, credit: 0, projectId: transaction.projectId },
-            { accountId: bankAccountId, debit: 0, credit: amount, projectId: transaction.projectId }
-        ];
-
-    const entry: JournalEntry = {
-        id: entryId,
-        date: transaction.date,
-        memo: transaction.memo || transaction.description,
-        status: 'posted',
-        currency: transaction.currency,
-        lines,
-        sourceType: 'bank-import',
-        sourceId: transaction.id,
-        createdBy,
-        createdAt: now,
-        updatedAt: now
-    };
-
-    const validationError = validateJournalEntry(entry);
-    if (validationError) {
-        throw new Error(validationError);
-    }
-
-    await journalEntriesCollection.doc(entryId).set(entry);
-    return entryId;
-};
-
-const extractFilename = (pathValue?: string) => {
-    if (!pathValue) return undefined;
-    try {
-        if (pathValue.startsWith('file://')) {
-            const url = new URL(pathValue);
-            const segments = url.pathname.split('/').filter(Boolean);
-            return segments[segments.length - 1];
+const mergeObjects = <T extends Record<string, unknown>>(target: T, source: Record<string, unknown>): T => {
+    const result = { ...target } as any;
+    Object.entries(source).forEach(([key, value]) => {
+        if (result[key] === undefined && value !== undefined) {
+            result[key] = value;
         }
-    } catch {
-        // fall through to string parsing
-    }
-
-    const cleaned = pathValue.split('?')[0];
-    const parts = cleaned.split('/').filter(Boolean);
-    return parts[parts.length - 1];
-};
-
-const normalizeReceiptExtraction = (payload?: ReceiptExtraction | Record<string, unknown>) => {
-    if (!payload) return undefined;
-    const anyPayload = payload as Record<string, unknown>;
-    const total = typeof anyPayload.total === 'number'
-        ? anyPayload.total
-        : typeof anyPayload.totalAmount === 'number'
-            ? anyPayload.totalAmount
-            : undefined;
-    const subtotal = typeof anyPayload.subtotal === 'number'
-        ? anyPayload.subtotal
-        : undefined;
-    const merchant = typeof anyPayload.merchant === 'string'
-        ? anyPayload.merchant
-        : typeof anyPayload.merchantName === 'string'
-            ? anyPayload.merchantName
-            : undefined;
-    const rawDate = typeof anyPayload.date === 'number' ? anyPayload.date : undefined;
-    const normalizedDate = rawDate && rawDate < 1_000_000_000_000 ? rawDate * 1000 : rawDate;
-
-    return {
-        merchant,
-        merchantName: merchant,
-        total,
-        totalAmount: total,
-        subtotal,
-        tax: typeof anyPayload.tax === 'number' ? anyPayload.tax : undefined,
-        date: normalizedDate,
-        currency: typeof anyPayload.currency === 'string' ? anyPayload.currency : undefined,
-        confidence: typeof anyPayload.confidence === 'number' ? anyPayload.confidence : undefined,
-        rawText: typeof anyPayload.rawText === 'string' ? anyPayload.rawText : undefined
-    };
+    });
+    return result as T;
 };
 
 const stripUndefined = <T extends Record<string, unknown>>(data: T): T => {
@@ -380,6 +317,56 @@ const parsePaymentMethod = (value?: string) => {
     if (/amex/i.test(value)) tenderType = 'card';
     if (/cash/i.test(value)) tenderType = 'cash';
     return { paymentMethod: value, cardLast4: last4, tenderType };
+};
+
+const extractFilename = (pathValue?: string) => {
+    if (!pathValue) return undefined;
+    try {
+        if (pathValue.startsWith('file://')) {
+            const url = new URL(pathValue);
+            const segments = url.pathname.split('/').filter(Boolean);
+            return segments[segments.length - 1];
+        }
+    } catch {
+        // fall through to string parsing
+    }
+
+    const cleaned = pathValue.split('?')[0];
+    const parts = cleaned.split('/').filter(Boolean);
+    return parts[parts.length - 1];
+};
+
+const normalizeReceiptExtraction = (payload?: ReceiptExtraction | Record<string, unknown>) => {
+    if (!payload) return undefined;
+    const anyPayload = payload as Record<string, unknown>;
+    const total = typeof anyPayload.total === 'number'
+        ? anyPayload.total
+        : typeof anyPayload.totalAmount === 'number'
+            ? anyPayload.totalAmount
+            : undefined;
+    const subtotal = typeof anyPayload.subtotal === 'number'
+        ? anyPayload.subtotal
+        : undefined;
+    const merchant = typeof anyPayload.merchant === 'string'
+        ? anyPayload.merchant
+        : typeof anyPayload.merchantName === 'string'
+            ? anyPayload.merchantName
+            : undefined;
+    const rawDate = typeof anyPayload.date === 'number' ? anyPayload.date : undefined;
+    const normalizedDate = rawDate && rawDate < 1_000_000_000_000 ? rawDate * 1000 : rawDate;
+
+    return {
+        merchant,
+        merchantName: merchant,
+        total,
+        totalAmount: total,
+        subtotal,
+        tax: typeof anyPayload.tax === 'number' ? anyPayload.tax : undefined,
+        date: normalizedDate,
+        currency: typeof anyPayload.currency === 'string' ? anyPayload.currency : undefined,
+        confidence: typeof anyPayload.confidence === 'number' ? anyPayload.confidence : undefined,
+        rawText: typeof anyPayload.rawText === 'string' ? anyPayload.rawText : undefined
+    };
 };
 
 const normalizeReceiptDetails = (payload: Record<string, unknown>) => {
@@ -468,7 +455,7 @@ const findMatchingTransaction = async (amount?: number, date?: number) => {
     const snapshot = await transactionsCollection.orderBy('date', 'desc').get();
     const transactions = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as BankTransaction);
     const targetDate = date as number;
-    const candidates = transactions.filter(txn => {
+    const candidates = transactions.filter((txn: BankTransaction) => {
         const amountMatch = Math.round(Math.abs(txn.amount) * 100) === Math.round(Math.abs(amount as number) * 100);
         const dateDiff = Math.abs(txn.date - targetDate);
         return amountMatch && dateDiff <= 1000 * 60 * 60 * 24 * 2;
@@ -511,10 +498,54 @@ const validateJournalEntry = (entry: JournalEntry) => {
     return null;
 };
 
-const fetchAccountsMap = async () => {
+const createJournalEntryForTransaction = async (
+    transaction: BankTransaction,
+    bankAccountId: string,
+    accountId: string,
+    createdBy: string
+) => {
+    const now = Date.now();
+    const entryId = crypto.randomUUID();
+    const amount = Math.abs(transaction.amount);
+    const isInflow = transaction.amount > 0;
+
+    const lines = isInflow
+        ? [
+            { accountId: bankAccountId, debit: amount, credit: 0, projectId: transaction.projectId },
+            { accountId, debit: 0, credit: amount, projectId: transaction.projectId }
+        ]
+        : [
+            { accountId, debit: amount, credit: 0, projectId: transaction.projectId },
+            { accountId: bankAccountId, debit: 0, credit: amount, projectId: transaction.projectId }
+        ];
+
+    const entry: JournalEntry = {
+        id: entryId,
+        date: transaction.date,
+        memo: transaction.memo || transaction.description,
+        status: 'posted',
+        currency: transaction.currency,
+        lines,
+        sourceType: 'bank-import',
+        sourceId: transaction.id,
+        createdBy,
+        createdAt: now,
+        updatedAt: now
+    };
+
+    const validationError = validateJournalEntry(entry);
+    if (validationError) {
+        throw new Error(validationError);
+    }
+
+    await journalEntriesCollection.doc(entryId).set(entry);
+    return entryId;
+};
+
+const fetchAccountsMap = async (): Promise<Map<string, Account>> => {
     const snapshot = await accountsCollection.orderBy('code', 'asc').get();
     const accounts = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Account);
-    return new Map(accounts.map(account => [account.id, account]));
+    return new Map(accounts.map((account: Account) => [account.id, account]));
 };
 
 const fetchJournalEntries = async () => {
@@ -649,6 +680,54 @@ router.delete('/accounts/:id', verifyToken, async (req: AuthenticatedRequest, re
     }
 });
 
+// GET /api/accounting/accounts/stats
+router.get('/accounts/stats', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const year = parseInt(req.query.year as string) || new Date().getFullYear();
+        const categoryStats: Record<string, CategoryStat> = {};
+
+        const accountsSnapshot = await accountsCollection.orderBy('code', 'asc').get();
+        const accounts = accountsSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Account);
+        accounts.forEach((account: Account) => {
+            categoryStats[account.id] = {
+                id: account.id,
+                name: account.name,
+                type: account.type,
+                actual: 0,
+                budget: 0,
+                difference: 0
+            };
+        });
+
+        const startOfYear = new Date(year, 0, 1).getTime();
+        const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
+
+        const entries = await fetchJournalEntries();
+        for (const entry of entries) {
+            if (entry.status !== 'posted') continue;
+            if (entry.date < startOfYear || entry.date > endOfYear) continue;
+
+            for (const line of entry.lines) {
+                const account = accounts.find((acc: Account) => acc.id === line.accountId);
+                if (account && (account.type === 'revenue' || account.type === 'cogs' || account.type === 'expense')) {
+                    const amount = account.type === 'revenue'
+                        ? roundToCents(line.credit - line.debit)
+                        : roundToCents(line.debit - line.credit);
+                    const stat = categoryStats[account.id];
+                    if (stat) {
+                        stat.actual = roundToCents((stat.actual || 0) + amount);
+                    }
+                }
+            }
+        }
+
+        res.json(Object.values(categoryStats));
+    } catch (error) {
+        console.error('Error fetching account stats:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 
 // POST /api/accounting/journal-entries
 router.post('/journal-entries', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
@@ -757,15 +836,14 @@ router.get('/journal-entries', verifyToken, async (req: AuthenticatedRequest, re
         const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
 
         const entries = await fetchJournalEntries();
-        const filtered = entries.filter(entry => {
+        const filtered = entries.filter((entry: JournalEntry) => {
             const inRange =
                 (!Number.isFinite(dateFrom) || entry.date >= dateFrom) &&
                 (!Number.isFinite(dateTo) || entry.date <= dateTo);
             if (!inRange) return false;
             if (!projectId) return true;
-            return entry.lines.some(line => line.projectId === projectId);
+            return entry.lines.some((line: JournalEntryLine) => line.projectId === projectId);
         });
-
         res.json(filtered);
     } catch (error) {
         console.error('Error listing journal entries:', error);
@@ -832,7 +910,8 @@ router.get('/imports/:id', verifyToken, async (req: AuthenticatedRequest, res: R
             return res.status(404).json({ error: 'Import not found.' });
         }
         res.json(doc.data() as AccountingImport);
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error fetching import:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
@@ -876,9 +955,88 @@ router.post('/imports/:id/process', verifyToken, async (req: AuthenticatedReques
         let categorizedCount = 0;
         let postedCount = 0;
 
+        const categoryStats: Record<string, CategoryStat> = {};
+        const accountsSnapshot = await accountsCollection.orderBy('code', 'asc').get();
+        if (accountsSnapshot.empty) {
+            // Seed defaults
+            const defaults = [
+                { id: '5000', name: 'Materials', type: 'cogs' },
+                { id: '5100', name: 'Subcontractor Costs', type: 'cogs' },
+                { id: '5200', name: 'Labor', type: 'cogs' }
+            ];
+
+            for (const def of defaults) {
+                if (!categoryStats[def.id]) {
+                    categoryStats[def.id] = {
+                        id: def.id,
+                        name: def.name,
+                        type: def.type as AccountType,
+                        actual: 0,
+                        budget: 0,
+                        difference: 0
+                    };
+                }
+            }
+        } else {
+            accountsSnapshot.docs.forEach((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+                const data = doc.data() as Account;
+                if (!categoryStats[data.id]) {
+                    categoryStats[data.id] = {
+                        id: data.id,
+                        name: data.name,
+                        type: data.type,
+                        actual: 0,
+                        budget: 0,
+                        difference: 0
+                    };
+                }
+            });
+        }
+
         for (const row of rows) {
             const transactionId = crypto.randomUUID();
-            const matchedRule = rules.find(rule => rule.isActive && row.description.toLowerCase().includes(rule.matchText.toLowerCase()));
+            // Find a matching rule based on description
+            let matchedRule: Rule | undefined;
+            for (const rule of rules) {
+                if (!rule.isActive) continue;
+
+                // Check for simple matchText rule
+                if (rule.matchText && row.description.toLowerCase().includes(rule.matchText.toLowerCase())) {
+                    matchedRule = rule;
+                    break;
+                }
+
+                // Check for condition-based rules (if matchText is not present or if conditions are more complex)
+                if (rule.conditions && Array.isArray(rule.conditions) && rule.conditions.length > 0) {
+                    const allConditionsMatch = rule.conditions.every((condition: RuleCondition) => {
+                        const field = condition.field as keyof BankTransaction;
+                        const operator = condition.operator;
+                        const value = condition.value;
+
+                        const rowValue = (row as any)[field]; // Use 'row' instead of 'transaction'
+
+                        switch (operator) {
+                            case 'includes':
+                                return typeof rowValue === 'string' && typeof value === 'string' && rowValue.toLowerCase().includes(value.toLowerCase());
+                            case 'equals':
+                                return rowValue === value;
+                            case 'greaterThan':
+                                return typeof rowValue === 'number' && typeof value === 'number' && rowValue > value;
+                            case 'lessThan':
+                                return typeof rowValue === 'number' && typeof value === 'number' && rowValue < value;
+                            // Add more operators as needed
+                            default:
+                                return false;
+                        }
+                    });
+
+                    if (allConditionsMatch) {
+                        matchedRule = rule;
+                        break;
+                    }
+                }
+            }
+
             const status: BankTransaction['status'] = matchedRule ? 'categorized' : 'uncategorized';
             const transaction: BankTransaction = {
                 id: transactionId,
@@ -943,10 +1101,10 @@ router.get('/transactions', verifyToken, async (req: AuthenticatedRequest, res: 
         const snapshot = await transactionsCollection.orderBy('date', 'desc').get();
         let transactions = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as BankTransaction);
         if (status) {
-            transactions = transactions.filter(txn => txn.status === status);
+            transactions = transactions.filter((txn: BankTransaction) => txn.status === status);
         }
         if (importId) {
-            transactions = transactions.filter(txn => txn.importId === importId);
+            transactions = transactions.filter((txn: BankTransaction) => txn.importId === importId);
         }
         res.json(transactions);
     } catch (error) {
@@ -1037,7 +1195,7 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
             processingVersion: details.processingVersion ?? 'v1',
             merchantName: mergedDetails.merchantName,
             merchantId,
-            transactionDate: details.transactionDate,
+            transactionDate: mergedDetails.transactionDate,
             subtotal: mergedDetails.subtotal,
             tax: mergedDetails.tax,
             total: mergedDetails.total,
@@ -1055,13 +1213,13 @@ router.post('/receipts', verifyToken, async (req: AuthenticatedRequest, res: Res
             updatedAt: now
         };
 
-        await receiptsCollection.doc(receiptId).set(stripUndefined(record as Record<string, unknown>));
+        await receiptsCollection.doc(receiptId).set(stripUndefined(record as unknown as Record<string, unknown>));
 
         void enrichReceiptAsync(receiptId, {
             rawOcrText: details.rawOcrText,
             rawLines: details.rawLines,
             extracted: body.extracted as Record<string, unknown>,
-            items: (body as Record<string, unknown>).items,
+            items: (body as Record<string, unknown>).items as ReceiptLineItem[] | undefined,
             returnPolicyText: details.returnPolicyText,
             paymentMethod: details.paymentMethod,
             source: 'auto'
@@ -1116,6 +1274,7 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             return res.status(404).json({ error: 'Receipt not found.' });
         }
 
+        const existing = doc.data() as Receipt;
         await docRef.update({ status: 'processing', updatedAt: Date.now() });
 
         if (!body.rawText && !body.extracted) {
@@ -1133,20 +1292,24 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
                 ...normalizedExtracted,
                 rawText: normalizedExtracted.rawText || body.rawText
             }
-            : extractReceiptData(body.rawText);
-        const cleanedExtracted = stripUndefined(extracted as Record<string, unknown>) as ReceiptExtraction;
+            : extractReceiptData(body.rawText || ''); // Ensure rawText is a string
 
-        const details = normalizeReceiptDetails({
-            ...((body.extracted || {}) as Record<string, unknown>),
-            rawText: body.rawText
-        });
+        const cleanedExtracted = stripUndefined(extracted as unknown as Record<string, unknown>) as ReceiptExtraction;
+
+        const details = normalizeReceiptDetails(
+            mergeObjects(
+                existing as unknown as Record<string, unknown>,
+                (body.extracted || {}) as unknown as Record<string, unknown>
+            )
+        );
         const mergedDetails = {
             ...details,
             merchantName: details.merchantName ?? extracted.merchantName ?? extracted.merchant,
             subtotal: details.subtotal ?? extracted.subtotal,
             tax: details.tax ?? extracted.tax,
             total: details.total ?? extracted.total ?? extracted.totalAmount,
-            currency: details.currency ?? extracted.currency
+            currency: details.currency ?? extracted.currency,
+            transactionDate: details.transactionDate ?? extracted.date
         };
         const merchantId = await upsertMerchant(mergedDetails.merchantName);
         const validationWarnings = validateReceiptTotals(mergedDetails);
@@ -1160,7 +1323,7 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             });
         }
 
-        await docRef.update(stripUndefined({
+        const updatePayload = stripUndefined({
             status: 'processed',
             extracted: cleanedExtracted,
             rawOcrText: details.rawOcrText,
@@ -1170,7 +1333,7 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             processingVersion: details.processingVersion ?? 'v1',
             merchantName: mergedDetails.merchantName,
             merchantId,
-            transactionDate: details.transactionDate,
+            transactionDate: mergedDetails.transactionDate,
             subtotal: mergedDetails.subtotal,
             tax: mergedDetails.tax,
             total: mergedDetails.total,
@@ -1185,13 +1348,15 @@ router.post('/receipts/:id/process', verifyToken, async (req: AuthenticatedReque
             linkedTransactionId,
             processedAt: Date.now(),
             updatedAt: Date.now()
-        }));
+        });
+
+        await docRef.update(updatePayload);
 
         void enrichReceiptAsync(receiptId, {
             rawOcrText: details.rawOcrText,
             rawLines: details.rawLines,
             extracted: body.extracted as Record<string, unknown>,
-            items: (body.extracted as Record<string, unknown>)?.items,
+            items: (body.extracted as Record<string, unknown>)?.items as ReceiptLineItem[] | undefined,
             returnPolicyText: details.returnPolicyText,
             paymentMethod: details.paymentMethod,
             source: 'auto'
@@ -1282,7 +1447,7 @@ router.post('/receipts/enrich', verifyToken, async (req: AuthenticatedRequest, r
         const snapshot = await receiptsCollection.orderBy('createdAt', 'desc').get();
         let receipts = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as Receipt);
         if (body.status) {
-            receipts = receipts.filter(receipt => receipt.status === body.status);
+            receipts = receipts.filter((receipt: Receipt) => receipt.status === body.status);
         }
 
         const targetReceipts = receipts.slice(0, limit);
@@ -1402,7 +1567,7 @@ router.get('/reports/pl', verifyToken, async (req: AuthenticatedRequest, res: Re
             return res.status(400).json({ error: 'dateFrom and dateTo are required.' });
         }
 
-        const accountsMap = await fetchAccountsMap();
+        const accountsMap: Map<string, Account> = await fetchAccountsMap();
         const entries = await fetchJournalEntries();
 
         const lineTotals = new Map<string, number>();
@@ -1474,7 +1639,7 @@ router.get('/reports/balance-sheet', verifyToken, async (req: AuthenticatedReque
             return res.status(400).json({ error: 'asOf is required.' });
         }
 
-        const accountsMap = await fetchAccountsMap();
+        const accountsMap: Map<string, Account> = await fetchAccountsMap();
         const entries = await fetchJournalEntries();
 
         const lineTotals = new Map<string, number>();
