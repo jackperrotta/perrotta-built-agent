@@ -11,7 +11,10 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static frontend files
-// Serve static frontend files (with .html extension resolution)
+// 1. Serve new website (public marketing site) - Primary
+app.use(express.static(path.resolve('apps/website/public'), { extensions: ['html'] }));
+
+// 2. Serve legacy web app (admin dashboard & fallbacks) - Secondary
 app.use(express.static(path.resolve('apps/web'), { extensions: ['html'] }));
 
 import sessionsRouter from './routes/sessions.js';
