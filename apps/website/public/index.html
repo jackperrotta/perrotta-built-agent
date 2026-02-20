@@ -9,8 +9,12 @@
 <body>
     <c-main-navbar><nav class="navbar" id="main-navbar">
     <div class="container navbar-container">
-        <a href="/" class="logo">
-            Perrotta Built
+        <a href="/" class="logo logo-wrapper">
+            <img src="/assets/images/cherry-logo.png" alt="Perrotta Built Logo" class="brand-logo">
+            <div class="logo-text">
+                <span>PERROTTA</span>
+                <span>BUILT</span>
+            </div>
         </a>
         <button class="menu-toggle" aria-label="Toggle navigation">
             <span class="bar"></span>
@@ -28,20 +32,18 @@
     <main>
         <!-- title: Home -->
 <!-- description: Perrotta Built - Premier Construction, Real Estate, and Investment Firm in Philadelphia. -->
-<c-hero-slider><div class="hero-slider">
-    <div class="hero-slide active" style="background-image: url('https://placehold.co/1920x1080?text=Premium+Renovations');">
-        <div class="hero-content">
-            <h1>Building Your Vision</h1>
-            <p>Experience the Perrotta Built difference.</p>
-            <a href="/services" class="btn-primary">View Services</a>
-        </div>
+<c-bg-video-hero><div class="bg-video-hero">
+    <video autoplay="" loop="" muted="" playsinline="" class="bg-video">
+        <source src="/assets/videos/south-philly-row-home.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <div class="video-overlay"></div>
+    <div class="hero-content">
+        <h1>Building Your Vision</h1>
+        <p>Experience the Perrotta Built difference.</p>
+        <a href="/services" class="btn-primary">View Services</a>
     </div>
-    <!-- Additional slides would go here -->
-    <div class="slider-controls">
-        <button class="prev" aria-label="Previous Slide">&lt;</button>
-        <button class="next" aria-label="Next Slide">&gt;</button>
-    </div>
-</div></c-hero-slider>
+</div></c-bg-video-hero>
 
 <section class="section bg-white">
     <div class="container">
@@ -80,7 +82,7 @@
             <a href="/contact" class="btn-primary">Get a Consultation</a>
         </div>
         <div class="image-wrapper">
-            <img src="https://placehold.co/600x400?text=Premium+Construction" alt="Construction Site" loading="lazy">
+            <img src="/assets/images/cherry-logo.png" alt="Perrotta Built Logo" loading="lazy" style="object-fit: contain; width: 100%; max-height: 400px; padding: 3rem; background: var(--color-secondary); border-radius: 8px;">
         </div>
     </div>
 </section>
@@ -96,7 +98,7 @@
     <c-footer><footer class="footer">
     <div class="container footer-content">
         <div class="footer-brand">
-            <h3>Perrotta Built</h3>
+            <img src="/assets/images/white-logo-w-name.png" alt="Perrotta Built" style="height: 45px; width: auto; margin-bottom: var(--spacing-sm); display: block;">
             <p>Building dreams, one home at a time.</p>
         </div>
         <div class="footer-links">

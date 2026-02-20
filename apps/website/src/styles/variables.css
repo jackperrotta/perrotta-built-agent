@@ -1,11 +1,17 @@
 :root {
     /* Colors */
-    --color-primary: #1a1a1a;
+    --color-primary: #000000;
+    /* Black */
     --color-secondary: #f4f4f4;
-    --color-accent: #c0392b;
-    --color-text: #333333;
+    /* Off-white / light gray */
+    --color-accent: #8b0000;
+    /* Deep cherry red */
+    --color-text: #000000;
+    /* Black */
     --color-text-light: #ffffff;
+    /* White */
     --color-background: #ffffff;
+    /* White */
 
     /* Typography */
     --font-primary: 'Inter', sans-serif;

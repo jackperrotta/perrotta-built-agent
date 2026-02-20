@@ -5,7 +5,7 @@
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -27,12 +27,42 @@
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -47,11 +77,33 @@
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {

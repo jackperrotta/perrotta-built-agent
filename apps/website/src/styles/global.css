@@ -108,6 +108,7 @@ body {
 /* Utility to ensure components have block display if custom elements are used as wrappers */
 c-main-navbar,
 c-footer,
-c-hero-slider {
+c-hero-slider,
+c-bg-video-hero {
     display: block;
 }

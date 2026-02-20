@@ -1,11 +1,17 @@
 :root {
     /* Colors */
-    --color-primary: #1a1a1a;
+    --color-primary: #000000;
+    /* Black */
     --color-secondary: #f4f4f4;
-    --color-accent: #c0392b;
-    --color-text: #333333;
+    /* Off-white / light gray */
+    --color-accent: #8b0000;
+    /* Deep cherry red */
+    --color-text: #000000;
+    /* Black */
     --color-text-light: #ffffff;
+    /* White */
     --color-background: #ffffff;
+    /* White */
 
     /* Typography */
     --font-primary: 'Inter', sans-serif;
@@ -190,7 +196,8 @@ body {
 /* Utility to ensure components have block display if custom elements are used as wrappers */
 c-main-navbar,
 c-footer,
-c-hero-slider {
+c-hero-slider,
+c-bg-video-hero {
     display: block;
 }
 /* main-navbar */
@@ -201,7 +208,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -223,12 +230,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -243,11 +280,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -356,7 +415,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -378,12 +437,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -398,11 +487,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -511,7 +622,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -533,12 +644,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -553,11 +694,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -614,98 +777,68 @@ c-hero-slider {
         clip-path: circle(150% at 100% 0);
     }
 }
-/* hero-slider */
-/* Hero Slider */
-.hero-slider {
+/* bg-video-hero */
+.bg-video-hero {
     position: relative;
     height: 100vh;
-    width: 100%;
-    overflow: hidden;
-    background-color: #000;
-}
-
-.hero-slide {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-size: cover;
-    background-position: center;
+    min-height: 600px;
     display: flex;
     align-items: center;
     justify-content: center;
-    text-align: center;
-    opacity: 0;
-    transition: opacity 1s ease;
+    overflow: hidden;
 }
 
-.hero-slide.active {
-    opacity: 1;
+.bg-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    transform: translateX(-50%) translateY(-50%);
+    z-index: -2;
+    object-fit: cover;
 }
 
-.hero-slide::before {
-    content: '';
+.video-overlay {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    /* Overlay */
+    background-color: rgba(0, 0, 0, 0.5);
+    /* Darken video for text readability */
+    z-index: -1;
 }
 
-.hero-content {
+.bg-video-hero .hero-content {
     position: relative;
-    z-index: 2;
-    color: white;
+    z-index: 1;
+    text-align: center;
+    color: var(--color-text-light);
     max-width: 800px;
-    padding: 2rem;
+    padding: var(--spacing-md);
 }
 
-.hero-content h1 {
+.bg-video-hero h1 {
     font-size: 4rem;
-    margin-bottom: 1rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    margin-bottom: var(--spacing-sm);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-.hero-content p {
+.bg-video-hero p {
     font-size: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.slider-controls {
-    position: absolute;
-    bottom: 2rem;
-    right: 2rem;
-    display: flex;
-    gap: 1rem;
-    z-index: 2;
-}
-
-.slider-controls button {
-    background: transparent;
-    border: 2px solid white;
-    color: white;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 1.2rem;
-    transition: all 0.3s ease;
-}
-
-.slider-controls button:hover {
-    background: white;
-    color: black;
+    margin-bottom: var(--spacing-md);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 @media (max-width: 768px) {
-    .hero-content h1 {
+    .bg-video-hero h1 {
         font-size: 2.5rem;
     }
 
-    .hero-content p {
+    .bg-video-hero p {
         font-size: 1.2rem;
     }
 }
@@ -761,7 +894,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -783,12 +916,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -803,11 +966,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -916,7 +1101,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -938,12 +1123,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -958,11 +1173,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -1071,7 +1308,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -1093,12 +1330,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -1113,11 +1380,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -1226,7 +1515,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -1248,12 +1537,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -1268,11 +1587,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -1381,7 +1722,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -1403,12 +1744,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -1423,11 +1794,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -1536,7 +1929,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -1558,12 +1951,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -1578,11 +2001,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {
@@ -1691,7 +2136,7 @@ c-hero-slider {
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: transparent;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
     padding: 1rem 0;
 }
@@ -1713,12 +2158,42 @@ c-hero-slider {
     align-items: center;
 }
 
-.logo {
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 55px;
+    /* Increased height so it's not cut off */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
     font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 2px;
+}
+
+.logo-text span {
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    transition: color 0.3s ease;
+    font-size: 1.15rem;
+}
+
+.navbar.scrolled .logo-text span {
     color: var(--color-primary);
-    /* Will need to invert on dark/transparent if hero is dark */
 }
 
 /* Nav Links */
@@ -1733,11 +2208,33 @@ c-hero-slider {
 .nav-links a {
     font-weight: 500;
     font-size: 1rem;
-    color: var(--color-text);
+    color: var(--color-text-light);
+    /* Default white on transparent bg */
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s ease;
 }
 
-.nav-links a:hover {
-    color: var(--color-accent);
+.navbar.scrolled .nav-links a {
+    color: var(--color-text);
+    /* Switch to dark text on scroll */
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 50%;
+    background-color: var(--color-accent);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+    width: 100%;
 }
 
 .btn-primary {

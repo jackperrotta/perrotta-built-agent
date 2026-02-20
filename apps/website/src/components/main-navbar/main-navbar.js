@@ -12,6 +12,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Active Link Logic
+    const currentPath = window.location.pathname;
+    const links = document.querySelectorAll('.nav-links a:not(.btn-primary)'); // Exclude contact button from underline style usually
+
+    links.forEach(link => {
+        const linkPath = link.getAttribute('href');
+        if (currentPath === linkPath || (currentPath.startsWith(linkPath) && linkPath !== '/')) {
+            link.classList.add('active');
+        }
+    });
+
     // Mobile Menu
     if (menuToggle) {
         menuToggle.addEventListener('click', () => {
